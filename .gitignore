@@ -1,4 +1,3 @@
-wifi_password.h
-ota_password.h
+passwords/*
 *.backup
 .*.swp

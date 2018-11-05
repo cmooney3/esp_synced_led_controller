@@ -12,6 +12,9 @@ BUILD_DIR="/tmp/esp8266_arduino_builds"
 # once we'll handle that later for efficiency's sake
 ACTION="--verify"
 
+# The directory where the OTA and wifi passwords are stored
+PASSWORDS_DIR="passwords"
+
 # The location of espota.py, this is used to perform ota updates
 ESPOTA="/home/${USER}/.arduino15/packages/esp8266/hardware/esp8266/"`
       `"2.3.0/tools/espota.py"
@@ -19,13 +22,15 @@ ESPOTA="/home/${USER}/.arduino15/packages/esp8266/hardware/esp8266/"`
 OTA_PORT="8266"
 # The header file that defines the OTA password when compiling.  This OTA
 # password is needed in this script to apply an OTA FW update.
-OTA_PASSWORD_FILE="ota_password.h"
+OTA_PASSWORD_FILE="${PASSWORDS_DIR}/ota_password.h"
+
 
 # Derived values from the configuration constants
 OUTPUT_BIN="${BUILD_DIR}/${INO}.bin"
 
 # Color codes to allow us to make the output prettier and easier to read
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 GREEN='\033[0;32m'
 WHITE='\033[0;97m'
 NC='\033[0m' # No Color
@@ -47,11 +52,44 @@ function print_success {
   echo -e "${GREEN}SUCCESS${NC}  $@"
 }
 
+function print_warn {
+  echo -e "${YELLOW}WARNING${NC}  $@"
+}
+
+function create_password_file_if_needed {
+  # This software relies on having both a WIFI and an OTA password, but for
+  # obvious security reasons these shouldn't be included in github.  They're
+  # instead defined in *_password.h files that are #included into the source.
+  # These *_password.h files can't be checked out, they need to be regenerated
+  # with each new checkout, so this function checks if they exists and builds
+  # them from user input if neccessary.
+  password_type="$1"  # Either "ota" or "wifi"
+  password_file="${PASSWORDS_DIR}/${password_type}_password.h"
+
+  if [ ! -f "${password_file}" ]; then
+    print_warn "Missing ${password_file}!  Generating one now:"
+
+    echo "What is the ${password_type} password? "
+    read password
+
+    mkdir -p ${PASSWORDS_DIR}
+    echo "const char* ${password_type}_password = \"${password}\";" > ${password_file}
+  fi
+}
+
 function compile {
   # Actually compile the source code into a binary using the Arduino compiler.
   print_heading "COMPILING..."
+
+  # Check to make sure the *_password.h files exist.  We can't build without them
+  create_password_file_if_needed "wifi"
+  create_password_file_if_needed "ota"
+
+  # Compilation command
   JAVA_TOOL_OPTIONS='-Djava.awt.headless=true' "${ARDUINO}" "${ACTION}" \
       "${INO}" --board "${BOARD}"  --pref build.path="${BUILD_DIR}" # --verbose
+
+  # Check that everything went smoothly
   err=$?
   if [ ${err} -ne 0 ]; then
     print_error "${INO} Failed to compile."
@@ -76,6 +114,9 @@ function find_all_arduino_ota_ips {
 }
 
 function do_ota_fw_updates {
+  # This function sends out OTA FW updates to every ESP it can find on the LAN
+  # by first scanning, then sending out the updates one by one.
+
   # First detect all the ESP's on the LAN and build an array of their IPs.
   print_heading "DETECTING OTA DEVICES ON THE LAN..."
   ota_ips=($(find_all_arduino_ota_ips))
