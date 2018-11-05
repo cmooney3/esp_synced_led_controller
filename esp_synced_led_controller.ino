@@ -1,30 +1,64 @@
-#define FASTLED_INTERNAL  // Supress pragma warnings about not using HW SPI for FastLED control
-#include <FastLED.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 
-#define DELAY_MS 100
-
-#define NUM_LEDS 1
-#define LED_PIN 5
-CRGB leds[NUM_LEDS];
+// Include a header file that defines the Wifi password.  This file is not
+// included in the github repo (obviously) and needs to be added manually.
+// The password.h file is also ignored by git (check .gitignore) to prevent
+// Accidentally uploading wifi passwords to github.
+// To use just create a file called password.h in this directory containing
+// a single line like this:
+// const char* password = "the_wifi_password";
+#include "password.h"
+extern const char* password;
+const char* ssid = "AirCanadaJazz";
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
-  pinMode(LED_PIN, OUTPUT);
-  FastLED.addLeds<WS2812B, LED_PIN, RGB>(leds, NUM_LEDS);
-  FastLED.setBrightness(64);
+  pinMode(LED_BUILTIN, OUTPUT);
+  
+  Serial.begin(115200);
+  Serial.println("Booting");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.println("Connection Failed! Rebooting...");
+    delay(5000);
+    ESP.restart();
+  }
+
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname("esp8266");
+
+  // No authentication by default
+  // ArduinoOTA.setPassword((const char *)"123");
+
+  ArduinoOTA.onStart([]() { Serial.println("Start"); });
+  ArduinoOTA.onEnd([]() { Serial.println("\nEnd"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 }
 
-uint8_t h = 0;
-int next_led_state = false;
-
-// the loop function runs over and over again forever
 void loop() {
-  leds[0] = CHSV(h, 255, 128);
-  h += 3;
-  FastLED.show();
-  
-  digitalWrite(LED_BUILTIN, next_led_state);
-  next_led_state = !next_led_state;
-
-  delay(DELAY_MS); 
+  ArduinoOTA.handle();
+   Serial.println("NEW FW!!");
+   Serial.println(WiFi.localIP());
+   delay(2000);
 }
