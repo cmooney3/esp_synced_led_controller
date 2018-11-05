@@ -81,6 +81,9 @@ function compile {
   # Actually compile the source code into a binary using the Arduino compiler.
   print_heading "COMPILING..."
 
+  # Make sure the build directory exists
+  mkdir -p ${BUILD_DIR}
+
   # Check to make sure the *_password.h files exist.  We can't build without them
   create_password_file_if_needed "wifi"
   create_password_file_if_needed "ota"
@@ -153,9 +156,6 @@ function do_ota_fw_updates {
 ################################################################################
 # Actual script starts running here 
 ################################################################################
-# Make sure the build directory exists
-mkdir -p ${BUILD_DIR}
-
 # Compile the .ino for ESP8266 using the Arduino IDE from the command line
 compile
 
