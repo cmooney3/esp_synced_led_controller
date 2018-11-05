@@ -9,6 +9,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
+#define SERIAL_BAUD_RATE 115200
+
 // Stringification macros to convert a #defined constant into a string to
 // output in a debugging message.
 // Usage: "Serial.print("Macro: " xstring(MACRO));
@@ -34,14 +36,7 @@ extern const char* ota_password;
 #define LED_BRIGHTNESS 64
 CRGB leds[NUM_LEDS];
 
-void setup() {
-  // Serial setup for debugging purposes
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println("--------------------------------------------------");
-  Serial.println("ESP8266 Booting now.");
-  Serial.println("--------------------------------------------------");
-
+void setupWifi() {
   // Wifi Setup
   Serial.println("* Connecting to Wifi");
   Serial.print("  - SSID: ");
@@ -55,7 +50,9 @@ void setup() {
   }
   Serial.print("  - IP address: ");
   Serial.println(WiFi.localIP());
+}
 
+void setupOTA() {
   // Arduino OTA FW updating Setup
   Serial.println("* Setting up Arduino OTA FW updating");
   Serial.print("  - Password: \"");
@@ -76,7 +73,9 @@ void setup() {
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
   });
   ArduinoOTA.begin();
+}
 
+void setupFastLED() {
   // LED setup for the RGB LEDs it's going to control
   Serial.println("* Configuring FastLED.");
   Serial.println("  - Type: " xstr(LED_TYPE));
@@ -91,6 +90,18 @@ void setup() {
   FastLED.setBrightness(LED_BRIGHTNESS);
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();
+}
+
+void setup() {
+  Serial.begin(SERIAL_BAUD_RATE);
+  Serial.println();
+  Serial.println("--------------------------------------------------");
+  Serial.println("ESP8266 Booting now.");
+  Serial.println("--------------------------------------------------");
+
+  setupWifi();
+  setupOTA();
+  setupFastLED();
 
   Serial.println("Set up complete!  Entering main program loop now.");
   Serial.println();
