@@ -5,14 +5,21 @@
 
 // Include a header file that defines the Wifi password.  This file is not
 // included in the github repo (obviously) and needs to be added manually.
-// The password.h file is also ignored by git (check .gitignore) to prevent
+// The wifi_password.h file is also ignored by git (check .gitignore) to prevent
 // Accidentally uploading wifi passwords to github.
 // To use just create a file called password.h in this directory containing
 // a single line like this:
-// const char* password = "the_wifi_password";
-#include "password.h"
-extern const char* password;
+// const char* wifi_password = "the_wifi_password";
+#include "wifi_password.h"
+extern const char* wifi_password;
 const char* ssid = "AirCanadaJazz";
+
+// Just like for the wifi password, it makes sense to keep this pwd off github.
+// This loads the OTA password from a file called ota_password.h that you have
+// to create with only one line like this:
+// const char* ota_password = "the_ota_password";
+#include "ota_password.h"
+extern const char* ota_password;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -20,7 +27,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Booting");
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, wifi_password);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
     delay(5000);
@@ -29,12 +36,9 @@ void setup() {
 
   // Port defaults to 8266
   // ArduinoOTA.setPort(8266);
-
   // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname("esp8266");
-
-  // No authentication by default
-  // ArduinoOTA.setPassword((const char *)"123");
+  //ArduinoOTA.setHostname("esp8266");
+  ArduinoOTA.setPassword(ota_password);
 
   ArduinoOTA.onStart([]() { Serial.println("Start"); });
   ArduinoOTA.onEnd([]() { Serial.println("\nEnd"); });

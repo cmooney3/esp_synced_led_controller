@@ -17,6 +17,9 @@ ESPOTA="/home/${USER}/.arduino15/packages/esp8266/hardware/esp8266/"`
       `"2.3.0/tools/espota.py"
 # The OTA port we're using
 OTA_PORT="8266"
+# The header file that defines the OTA password when compiling.  This OTA
+# password is needed in this script to apply an OTA FW update.
+OTA_PASSWORD_FILE="ota_password.h"
 
 # Derived values from the configuration constants
 OUTPUT_BIN="${BUILD_DIR}/${INO}.bin"
@@ -87,12 +90,16 @@ function do_ota_fw_updates {
   fi
   echo
 
+  # Get the OTA password out of ota_password.h
+  ota_password="$(cat ${OTA_PASSWORD_FILE} | cut -d\" -f2)"
+
   # Go through each of those IPs one-by-one and perform OTA FW updates.
   print_heading "SENDING OTA FW UPDATES..."
   for ip in "${ota_ips[@]}"
   do
     echo "Target: ${ip}"
-    python ${ESPOTA} -i $ip -p "${OTA_PORT}" -f "${OUTPUT_BIN}" #--auth="$password"
+    python ${ESPOTA} -i $ip -p "${OTA_PORT}" -f "${OUTPUT_BIN}" \
+	   --auth="${ota_password}"
     ret=$?
     if [ ${ret} -ne 0 ]; then
       print_error "esptool.py failed to apply update (err code: ${ret})"
