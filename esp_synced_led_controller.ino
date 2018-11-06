@@ -115,8 +115,8 @@ void loop() {
   // Update the LEDS to the next hue, creating a fading rainbow effect.
   fill_solid(leds, NUM_LEDS, CHSV(h++, 255, 128));
   FastLED.show();
-  Serial.print("hue: ");
-  Serial.println(h);
+//  Serial.print("hue: ");
+//  Serial.println(h);
 
   // Delay a tiny bit before continuing so everything doesn't go too fast.
   delay(10);
