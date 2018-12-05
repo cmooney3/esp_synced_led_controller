@@ -35,19 +35,6 @@ GREEN='\033[0;32m'
 WHITE='\033[0;97m'
 NC='\033[0m' # No Color
 
-# Parse the command line arguments
-UPDATE_SERIAL="serial"
-UPDATE_OTA="ota"
-UPDATE_TYPE="" # Don't upload at all by default, just build.
-if [ $# -ge 1 ]; then
-  if [ $1 == "--serial" -o $1 == "-s" ]; then
-    UPDATE_TYPE="${UPDATE_SERIAL}"
-  fi
-  if [ $1 == "--ota" -o $1 == "-o" ]; then
-    UPDATE_TYPE="${UPDATE_OTA}"
-  fi
-fi
-
 function print_heading {
   # Print out a nice colored heading to help separate out various sections of
   # the output.
@@ -68,6 +55,14 @@ function print_success {
 function print_warn {
   echo -e "${YELLOW}WARNING${NC}  $@"
 }
+
+function usage {
+  echo "Usage: ./build.sh [--ota|--serial]"
+  echo "build.sh will compile the project and optionally flash all availible ESPs"
+  echo "with the program over either serial connections or OTA updates"
+  exit 1
+}
+
 
 function create_password_file_if_needed {
   # This software relies on having both a WIFI and an OTA password, but for
@@ -214,6 +209,25 @@ function do_serial_fw_updates() {
 ################################################################################
 # Actual script starts running here 
 ################################################################################
+# Parse the command line arguments
+UPDATE_SERIAL="serial"
+UPDATE_OTA="ota"
+UPDATE_TYPE="" # Don't upload at all by default, just build.
+if [ $# -gt 1 ]; then
+    print_error "Too many arguments ($#)"
+    usage
+fi
+if [ $# -eq 1 ]; then
+  if [ $1 == "--serial" -o $1 == "-s" ]; then
+    UPDATE_TYPE="${UPDATE_SERIAL}"
+  elif [ $1 == "--ota" -o $1 == "-o" ]; then
+    UPDATE_TYPE="${UPDATE_OTA}"
+  else
+    print_error "Unknown flag $1"
+    usage
+  fi
+fi
+
 # Compile the .ino for ESP8266 using the Arduino IDE from the command line
 compile
 
