@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Note: You need to have the esp8266 board installed in Arduino for this to work.
+# Running these two commands *should* install the correct board definitions.
+# arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+# arduino --install-boards esp8266:esp8266 --save-prefs
+#
+# Then you need to actually open up the arduino ide and set the settings in there
+# once.  I'm not sure why you can't do it from the command line, but F_CPU doesn't
+# seem to get set otherwise.  Once you do it with the ide once this script should
+# work.
+
 # The board spec for the Arduino compiler to use as a target when building
 BOARD="esp8266:esp8266:generic"
 # Location of the arduino executable to use
