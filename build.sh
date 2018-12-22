@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Note: You need to have the esp8266 board installed in Arduino for this to work.
+# Running these two commands *should* install the correct board definitions.
+# arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+# arduino --install-boards esp8266:esp8266 --save-prefs
+#
+# Then you need to actually open up the arduino ide and set the settings in there
+# once.  I'm not sure why you can't do it from the command line, but F_CPU doesn't
+# seem to get set otherwise.  Once you do it with the ide once this script should
+# work.
+
 # The board spec for the Arduino compiler to use as a target when building
 BOARD="esp8266:esp8266:generic"
 # Location of the arduino executable to use
@@ -16,8 +26,7 @@ ACTION="--verify"
 PASSWORDS_DIR="passwords"
 
 # The location of espota.py, this is used to perform ota updates
-ESPOTA="/home/${USER}/.arduino15/packages/esp8266/hardware/esp8266/"`
-      `"2.3.0/tools/espota.py"
+ESPOTA=$(find ${HOME}/.arduino15 -name espota.py)
 # The OTA port we're using
 OTA_PORT="8266"
 # The header file that defines the OTA password when compiling.  This OTA
@@ -128,6 +137,15 @@ function do_ota_fw_updates {
   # This function sends out OTA FW updates to every ESP it can find on the LAN
   # by first scanning, then sending out the updates one by one.
 
+  # Make sure that esptoa.py was found -- it's what does the actual updates, so
+  # if we can't find it we should just stop now.
+  if [ -z "${ESPOTA}" -o ! -f "${ESPOTA}" ]; then
+    print_error "Unable to find espota.py on your system.  This is"\
+                "required for OTA updates, and should be found in your"\
+                "arduino installation."
+    return 1
+  fi
+
   # First detect all the ESP's on the LAN and build an array of their IPs.
   print_heading "DETECTING OTA DEVICES ON THE LAN..."
   ota_ips=($(find_all_arduino_ota_ips))
@@ -151,7 +169,7 @@ function do_ota_fw_updates {
   do
     echo "FW Update Target: ${ip}"
     python ${ESPOTA} -i $ip -p "${OTA_PORT}" -f "${OUTPUT_BIN}" \
-	   --auth="${ota_password}"
+           --auth="${ota_password}"
     ret=$?
     if [ ${ret} -ne 0 ]; then
       print_error "espota.py failed to apply update (err code: ${ret})"
