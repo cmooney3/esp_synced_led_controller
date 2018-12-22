@@ -30,7 +30,7 @@ const char* ssid = "AirCanadaJazz";
 #include "passwords/ota_password.h"
 extern const char* ota_password;
 
-#define NUM_LEDS 1
+#define NUM_LEDS 5
 #define LED_PIN 5
 #define LED_TYPE WS2812B
 #define LED_BRIGHTNESS 64
@@ -102,6 +102,7 @@ void setup() {
   setupWifi();
   setupOTA();
   setupFastLED();
+  FastLED.setBrightness(16);
 
   Serial.println("Set up complete!  Entering main program loop now.");
   Serial.println();
@@ -113,7 +114,8 @@ void loop() {
   ArduinoOTA.handle();
 
   // Update the LEDS to the next hue, creating a fading rainbow effect.
-  fill_solid(leds, NUM_LEDS, CHSV(h++, 255, 128));
+  fill_rainbow(leds, NUM_LEDS, h++, 10);
+
   FastLED.show();
 //  Serial.print("hue: ");
 //  Serial.println(h);
