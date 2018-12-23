@@ -22,17 +22,8 @@ BUILD_DIR="/tmp/esp8266_arduino_builds"
 # once we'll handle that later for efficiency's sake
 ACTION="--verify"
 
-# The directory where the OTA and wifi passwords are stored
+# The directory where the networking password(s) are stored
 PASSWORDS_DIR="passwords"
-
-# The location of espota.py, this is used to perform ota updates
-ESPOTA=$(find ${HOME}/.arduino15 -name espota.py)
-# The OTA port we're using
-OTA_PORT="8266"
-# The header file that defines the OTA password when compiling.  This OTA
-# password is needed in this script to apply an OTA FW update.
-OTA_PASSWORD_FILE="${PASSWORDS_DIR}/ota_password.h"
-
 
 # Derived values from the configuration constants
 OUTPUT_BIN="${BUILD_DIR}/${INO}.bin"
@@ -66,21 +57,21 @@ function print_warn {
 }
 
 function usage {
-  echo "Usage: ./build.sh [--ota|--serial]"
+  echo "Usage: ./build.sh [--flash]"
   echo "build.sh will compile the project and optionally flash all availible ESPs"
-  echo "with the program over either serial connections or OTA updates"
+  echo "with the program over a serial connection"
   exit 1
 }
 
 
 function create_password_file_if_needed {
-  # This software relies on having both a WIFI and an OTA password, but for
+  # This software relies on having secret passwords for networking, but for
   # obvious security reasons these shouldn't be included in github.  They're
   # instead defined in *_password.h files that are #included into the source.
   # These *_password.h files can't be checked out, they need to be regenerated
   # with each new checkout, so this function checks if they exists and builds
   # them from user input if neccessary.
-  password_type="$1"  # Either "ota" or "wifi"
+  password_type="$1"
   password_file="${PASSWORDS_DIR}/${password_type}_password.h"
 
   if [ ! -f "${password_file}" ]; then
@@ -101,9 +92,10 @@ function compile {
   # Make sure the build directory exists
   mkdir -p ${BUILD_DIR}
 
-  # Check to make sure the *_password.h files exist.  We can't build without them
-  create_password_file_if_needed "wifi"
-  create_password_file_if_needed "ota"
+  # Check to make sure the Mesh password exists.  We can't build without them
+  # because it's required information for connecting to the mesh network.
+  # TODO -- uncomment this and actually use this password.
+  # create_password_file_if_needed "mesh"
 
   # Compilation command
   JAVA_TOOL_OPTIONS='-Djava.awt.headless=true' "${ARDUINO}" "${ACTION}" \
@@ -119,64 +111,6 @@ function compile {
     print_success "${INO} compiled without errors."
   fi
   echo
-}
-
-function find_all_arduino_ota_ips {
-  # This scans the LAN for esp's that are availible for OTA updates.  Right now
-  # we just assume *all* the esps that support OTA on the LAN are ours.
-  # Note: When calling this if you want the ips in a nice bash array you have
-  # to call it with ()'s around it like ips=($(find_all_arduino_ota_ips)).
-  # Also Note: I don't know how this function works, I just copy/pasted from 
-  # https://github.com/esp8266/Arduino/issues/3553
-  # TODO -- Check to see if these devices are the right kind (not other esps)
-  ((avahi-browse _arduino._tcp --resolve --parsable --terminate) 2>/dev/null | \
-    grep -F "=;") | cut -d\; -f8
-}
-
-function do_ota_fw_updates {
-  # This function sends out OTA FW updates to every ESP it can find on the LAN
-  # by first scanning, then sending out the updates one by one.
-
-  # Make sure that esptoa.py was found -- it's what does the actual updates, so
-  # if we can't find it we should just stop now.
-  if [ -z "${ESPOTA}" -o ! -f "${ESPOTA}" ]; then
-    print_error "Unable to find espota.py on your system.  This is"\
-                "required for OTA updates, and should be found in your"\
-                "arduino installation."
-    return 1
-  fi
-
-  # First detect all the ESP's on the LAN and build an array of their IPs.
-  print_heading "DETECTING OTA DEVICES ON THE LAN..."
-  ota_ips=($(find_all_arduino_ota_ips))
-  if [ ${#ota_ips[@]} -eq 0 ]; then
-    print_error "No OTA device(s) found on the network."
-  else
-    print_success "Found ${#ota_ips[@]} OTA devices on the network:"
-    for ip in ${ota_ips[@]}
-    do
-      echo -e "\t- ${ip}"
-    done
-  fi
-  echo
-
-  # Get the OTA password out of ota_password.h
-  ota_password="$(cat ${OTA_PASSWORD_FILE} | cut -d\" -f2)"
-
-  # Go through each of those IPs one-by-one and perform OTA FW updates.
-  print_heading "PERFORMING OTA FW UPDATES..."
-  for ip in "${ota_ips[@]}"
-  do
-    echo "FW Update Target: ${ip}"
-    python ${ESPOTA} -i $ip -p "${OTA_PORT}" -f "${OUTPUT_BIN}" \
-           --auth="${ota_password}"
-    ret=$?
-    if [ ${ret} -ne 0 ]; then
-      print_error "espota.py failed to apply update (err code: ${ret})"
-    else
-      print_success
-    fi
-  done
 }
 
 function do_serial_fw_updates() {
@@ -228,18 +162,15 @@ function do_serial_fw_updates() {
 # Actual script starts running here 
 ################################################################################
 # Parse the command line arguments
-UPDATE_SERIAL="serial"
-UPDATE_OTA="ota"
-UPDATE_TYPE="" # Don't upload at all by default, just build.
 if [ $# -gt 1 ]; then
     print_error "Too many arguments ($#)"
     usage
 fi
+
+FLASH_REQUESTED=0
 if [ $# -eq 1 ]; then
-  if [ $1 == "--serial" -o $1 == "-s" ]; then
-    UPDATE_TYPE="${UPDATE_SERIAL}"
-  elif [ $1 == "--ota" -o $1 == "-o" ]; then
-    UPDATE_TYPE="${UPDATE_OTA}"
+  if [ $1 == "--flash" -o $1 == "-f" ]; then
+    FLASH_REQUESTED=1
   else
     print_error "Unknown flag $1"
     usage
@@ -249,11 +180,7 @@ fi
 # Compile the .ino for ESP8266 using the Arduino IDE from the command line
 compile
 
-# If selected the FW update style of choice (either OTA or via serial connection)
-if [ "${UPDATE_TYPE}" == "${UPDATE_OTA}" ]; then
-  do_ota_fw_updates
-elif [ "${UPDATE_TYPE}" == "${UPDATE_SERIAL}" ]; then
+# If selected, flash the FW update
+if [ ${FLASH_REQUESTED} -ne 0 ]; then
   do_serial_fw_updates
-else
-  exit 0
 fi
