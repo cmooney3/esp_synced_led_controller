@@ -7,8 +7,18 @@
 #include "animations/pulse.h"
 #include "animations/rainbow.h"
 
+
+// The Pin assignments for the various peripherals attached to the board.
+static constexpr uint8_t kButtonPin = 16;
+static constexpr uint8_t kSwitchPin = 14;
+static constexpr uint8_t kLEDPin = 5;
+
+// Details of the LEDs attached
+static constexpr uint16_t kNumLEDs = 5; // How Many LEDs are connected
+#define LED_TYPE WS2812B
+
 // The baud rate to use for the serial output (debugging info/etc).
-constexpr int kSerialBaudRate = 115200;
+static constexpr uint32_t kSerialBaudRate = 115200;
 
 // Stringification macros to convert a #defined constant into a string to
 // output in a debugging message.
@@ -16,23 +26,10 @@ constexpr int kSerialBaudRate = 115200;
 #define xstr(a) str(a)
 #define str(a) #a
 
-// How many frames each animation gets to run for (duration)
-constexpr int kNumFrames = 300;
-
-// How long to delay (in MS) between generating frames
-constexpr int kFrameDelayMS = 20;
-
-// How Many LEDs are connected
-static constexpr int kNumLEDs = 5;
-
-// Which pin (GPIO) are the LEDS connected to
-static constexpr int kLEDPin = 5;
-
-// Which brightness level should we run the LEDs at
-static constexpr int kLEDBrightness = 64;
-
-// Which type of LEDs are connected
-#define LED_TYPE WS2812B
+// Animation settings
+static constexpr uint16_t kNumFrames = 300; // How many frames each animation gets to run for (duration)
+static constexpr uint8_t kFrameDelayMS = 20; // How long to delay (in MS) between generating frames
+static constexpr uint8_t kLEDBrightness = 64; // Which brightness level should we run the LEDs at
 
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
@@ -57,7 +54,7 @@ Animation* buildNewAnimation(AnimationType type) {
 Animation* current_animation;
 
 void SwitchToNextAnimation() {
-  static int next_animation_type = 0;
+  static uint8_t next_animation_type = 0;
   // First, avoid memory leaks by deleting the animation that's ending.
   if (current_animation) {
     delete current_animation;
