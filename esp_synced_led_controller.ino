@@ -9,12 +9,13 @@
 
 
 // The Pin assignments for the various peripherals attached to the board.
-static constexpr uint8_t kButtonPin = 0;
-static constexpr uint8_t kSwitchPin = 14;
+static constexpr uint8_t kBrightnessButtonPin = 0;
+static constexpr uint8_t kSyncSwitchPin = 14;
 static constexpr uint8_t kLEDPin = 5;
 
 // Debounce configurations for the buttons
-constexpr int kBtnBounceTimeMS = 200;
+constexpr int kButtonBounceTimeMS = 100;
+constexpr int kSwitchBounceTimeMS = 100;
 
 // Details of the LEDs attached
 static constexpr uint16_t kNumLEDs = 5; // How Many LEDs are connected
@@ -72,19 +73,36 @@ void SwitchToNextAnimation() {
 // This works by setting the brightness_setting value with a new value.
 // When the main loop sees that this value is changed, it'll update the
 // brightness of the main LEDs via FastLEDs setBrightness() routine.
-int brightnesses[] = {7, 128, 255};
+int brightnesses[] = {7, 40, 88};
 int num_brightnesses = sizeof(brightnesses) / sizeof(brightnesses[0]);
 volatile int brightness_setting = 0; // Start at he lowest brightness on boot
 int current_brightness = brightness_setting;
-static unsigned long last_brightness_press_time = 0;
+static uint32_t last_brightness_button_press_time = 0;
 void onBrightnessButtonChange() {
   // Handle a button press of the brightness button.
-  unsigned long now = millis();
-  if (now - last_brightness_press_time > kBtnBounceTimeMS &&
-     !digitalRead(kButtonPin)) {
-    brightness_setting = (brightness_setting + 1) % num_brightnesses;
+  uint32_t now = millis();
+  if (now - last_brightness_button_press_time > kButtonBounceTimeMS) {
+    if (!digitalRead(kBrightnessButtonPin)) {
+      brightness_setting = (brightness_setting + 1) % num_brightnesses;
+    }
   }
-  last_brightness_press_time = now;
+  last_brightness_button_press_time = now;
+}
+
+// Interrupt handler for the sync switch.
+// TODO: Use this value to actually control if it syncs
+// Right now all this does is debounce the switch and print a debug msg out
+// over serial so I can test that the switch is working right.
+static unsigned long last_sync_switch_change_time = 0;
+void onSyncSwitchChange() {
+  bool switch_state = digitalRead(kSyncSwitchPin);
+  unsigned long now = millis();
+  if (now - last_sync_switch_change_time > kSwitchBounceTimeMS) {
+    Serial.print("Sync Switch Interrupt detected!  Switch position: ");
+    Serial.print(switch_state);
+    Serial.println();
+  }
+  last_sync_switch_change_time = now;
 }
 
 void setupUI() {
@@ -92,8 +110,12 @@ void setupUI() {
   // as brightness controls and radio switches.
 
   // Set up the brightness button.
-  pinMode(kButtonPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(kButtonPin), onBrightnessButtonChange, CHANGE);
+  pinMode(kBrightnessButtonPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(kBrightnessButtonPin), onBrightnessButtonChange, CHANGE);
+
+  // Set up the sync switch.
+  pinMode(kSyncSwitchPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(kSyncSwitchPin), onSyncSwitchChange, CHANGE);
 }
 
 void setupFastLED() {
