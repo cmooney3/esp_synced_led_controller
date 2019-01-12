@@ -2,6 +2,12 @@
 #define FASTLED_INTERNAL  // Supress pragma warnings about not using HW SPI for FastLED control
 #include <FastLED.h>
 
+// Includes/setup for painlessMesh
+#include <painlessMesh.h>
+#define MESH_PREFIX "dummy_prefix"  // TODO: Update these to be better choices, etc
+#define MESH_PASSWORD "dummy_password"
+#define MESH_PORT 34553
+
 // All the various animations
 #include "animations/drop.h"
 #include "animations/pulse.h"
@@ -33,21 +39,37 @@ static constexpr uint32_t kSerialBaudRate = 115200;
 static constexpr uint16_t kNumFrames = 300; // How many frames each animation gets to run for (duration)
 static constexpr uint8_t kFrameDelayMS = 20; // How long to delay (in MS) between generating frames
 
+// How frequently should we be checking for new brightness levels
+static constexpr uint8_t kBrightnessUpdateMS = 250;
+
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
+
+// Build out the Mesh networking object, the scheduler and the tasks the scheduler runs
+painlessMesh mesh;  // Instantiate a mesh object to get the mesh networking up and running!
+Scheduler userScheduler; // This is the main scheduler that schedules everything
+// The function declarations of the functions called by the tasks that we'll be scheduling
+void sendMessage();
+void renderNextFrame();
+void updateBrightness();
+// Build the actual "task" objects that are linked with periods, function pointers/etc
+Task taskSendMessage(TASK_SECOND * 1, TASK_FOREVER, &sendMessage);
+Task taskRenderNextFrame(kFrameDelayMS, TASK_FOREVER, &renderNextFrame);
+Task taskUpdateBrightness(kBrightnessUpdateMS, TASK_FOREVER, &updateBrightness);
+
 
 // Here we define the list of animations that the controller can play
 // by building up an enum full of their names and a generator function
 // that returns a generic Animation* give the type of animation.
 // When adding a new animation, this is where you do the book-keeping.
-enum AnimationType {DROP, RAINBOW, PULSE, NUM_ANIMATION_TYPES};
+enum AnimationType {ANIM_DROP, ANIM_RAINBOW, ANIM_PULSE, NUM_ANIMATION_TYPES} typedef AnimationType;
 Animation* buildNewAnimation(AnimationType type) {
   switch (type) {
-    case AnimationType::PULSE:
+    case AnimationType::ANIM_PULSE:
       return new Pulse::PulseAnimation(leds, kNumLEDs, kNumFrames);
-    case AnimationType::RAINBOW:
+    case AnimationType::ANIM_RAINBOW:
       return new Rainbow::RainbowAnimation(leds, kNumLEDs, kNumFrames);
-    case AnimationType::DROP:
+    case AnimationType::ANIM_DROP:
       return new Drop::DropAnimation(leds, kNumLEDs, kNumFrames);
     default:
       return NULL;
@@ -113,6 +135,70 @@ void setupFastLED() {
   FastLED.show();
 }
 
+void receivedCallback(uint32_t from, String &msg) {
+  Serial.printf("Received from %d msg=%s\n", from, msg.c_str());
+}
+
+void newConnectionCallback(bool adopt) {
+  Serial.printf("New Connection, adopt=%d\n", adopt);
+}
+
+void changedConnectionCallback() {
+  Serial.printf("Changed connections %s\n",mesh.subConnectionJson().c_str());
+}
+
+void nodeTimeAdjustedCallback(int32_t offset) {
+  Serial.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(),offset);
+}
+
+void setupNetworking() {
+  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
+  mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  mesh.onReceive(&receivedCallback);
+  mesh.onNewConnection(&newConnectionCallback);
+  mesh.onChangedConnections(&changedConnectionCallback);
+  mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
+
+  userScheduler.addTask(taskSendMessage);
+  taskSendMessage.enable();
+  userScheduler.addTask(taskRenderNextFrame);
+  taskRenderNextFrame.enable();
+  userScheduler.addTask(taskUpdateBrightness);
+  taskUpdateBrightness.enable();
+}
+
+
+void sendMessage() {
+  // This is a stupid task that we won't really want in the end, but it's a good way to test
+  // the mesh network/etc.  Hanging onto it for a bit until everything's working.
+  String msg = "Hello from node ";
+  msg += mesh.getNodeId();
+  mesh.sendBroadcast( msg );
+  taskSendMessage.setInterval( random( TASK_SECOND * 1, TASK_SECOND * 5 ));
+}
+
+void renderNextFrame() {
+  // Render the next frame
+  bool has_more_frames = current_animation->nextFrame();
+  FastLED.show();
+
+  // If that was the last frame of the animation, queue up the next one
+  if (!has_more_frames) {
+    SwitchToNextAnimation();
+  }
+}
+
+void updateBrightness() {
+  // Update FastLED's brightness setting if the user changed it.
+  if (brightness_setting != current_brightness) {
+    FastLED.setBrightness(brightnesses[brightness_setting]);
+    current_brightness = brightness_setting;
+  }
+}
+
+
 void setup() {
   Serial.begin(kSerialBaudRate);
   Serial.println();
@@ -125,6 +211,8 @@ void setup() {
   setupFastLED();
   FastLED.setBrightness(16);
 
+  setupNetworking();
+
   // Set up the starting animation
   current_animation = buildNewAnimation(static_cast<AnimationType>(0));
 
@@ -133,18 +221,6 @@ void setup() {
 }
 
 void loop() {
-  SwitchToNextAnimation();
-
-  bool has_more_frames = true;
-  while(has_more_frames) {
-    has_more_frames = current_animation->nextFrame();
-    FastLED.show();
-    FastLED.delay(kFrameDelayMS);
-
-    // Update FastLED's brightness setting if the user changed it.
-    if (brightness_setting != current_brightness) {
-      FastLED.setBrightness(brightnesses[brightness_setting]);
-      current_brightness = brightness_setting;
-    }
-  }
+  userScheduler.execute();
+  mesh.update();
 }
