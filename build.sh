@@ -28,6 +28,9 @@ PASSWORDS_DIR="passwords"
 # Derived values from the configuration constants
 OUTPUT_BIN="${BUILD_DIR}/${INO}.bin"
 
+# Where ESPTOOL is, use find to not need to set it all up
+ESPTOOL="$(find ${HOME}/.arduino15/ -name esptool -type f)"
+
 # Color codes to allow us to make the output prettier and easier to read
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -145,8 +148,7 @@ function do_serial_fw_updates() {
     # when updating.  If something changes, just change --verify to --upload 
     # (and add --verbose) and run it once.  Look for the line like this that
     # uploads the program and replace it here.
-    ~/.arduino15/packages/esp8266/tools/esptool/0.4.9/esptool -cd ck \
-     -cb 115200 -cp ${port} -ca 0x00000 -cf ${OUTPUT_BIN}
+    ${ESPTOOL} -cd ck -cb 115200 -cp ${port} -ca 0x00000 -cf ${OUTPUT_BIN}
     ret=$?
 
     # Check that there were no errors when uploading.
