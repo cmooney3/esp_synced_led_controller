@@ -87,6 +87,9 @@ void SwitchToNextAnimation() {
   // Create a new animation object of the next type.
   current_animation = buildNewAnimation(
                           static_cast<AnimationType>(next_animation_type));
+  Serial.printf("New animation Started (type: %d)\n", next_animation_type);
+
+  // Advance to the next animation.
   next_animation_type = (next_animation_type + 1) % NUM_ANIMATION_TYPES;
 }
 
@@ -94,7 +97,7 @@ void SwitchToNextAnimation() {
 // This works by setting the brightness_setting value with a new value.
 // When the main loop sees that this value is changed, it'll update the
 // brightness of the main LEDs via FastLEDs setBrightness() routine.
-int brightnesses[] = {7, 128, 255};
+int brightnesses[] = {7, 10, 30};
 int num_brightnesses = sizeof(brightnesses) / sizeof(brightnesses[0]);
 volatile int brightness_setting = 0; // Start at he lowest brightness on boot
 int current_brightness = brightness_setting;
@@ -153,20 +156,13 @@ void nodeTimeAdjustedCallback(int32_t offset) {
 
 void setupNetworking() {
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+  mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
 
   mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
-
-  userScheduler.addTask(taskSendMessage);
-  taskSendMessage.enable();
-  userScheduler.addTask(taskRenderNextFrame);
-  taskRenderNextFrame.enable();
-  userScheduler.addTask(taskUpdateBrightness);
-  taskUpdateBrightness.enable();
 }
 
 
@@ -176,7 +172,7 @@ void sendMessage() {
   String msg = "Hello from node ";
   msg += mesh.getNodeId();
   mesh.sendBroadcast( msg );
-  taskSendMessage.setInterval( random( TASK_SECOND * 1, TASK_SECOND * 5 ));
+  taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
 }
 
 void renderNextFrame() {
@@ -198,6 +194,17 @@ void updateBrightness() {
   }
 }
 
+void setupTasks() {
+  userScheduler.addTask(taskSendMessage);
+  taskSendMessage.enable();
+
+  userScheduler.addTask(taskRenderNextFrame);
+  taskRenderNextFrame.enable();
+
+  userScheduler.addTask(taskUpdateBrightness);
+  taskUpdateBrightness.enable();
+}
+
 
 void setup() {
   Serial.begin(kSerialBaudRate);
@@ -211,7 +218,9 @@ void setup() {
   setupFastLED();
   FastLED.setBrightness(16);
 
-  setupNetworking();
+//  setupNetworking();
+
+  setupTasks();
 
   // Set up the starting animation
   current_animation = buildNewAnimation(static_cast<AnimationType>(0));
@@ -222,5 +231,5 @@ void setup() {
 
 void loop() {
   userScheduler.execute();
-  mesh.update();
+//  mesh.update();
 }
