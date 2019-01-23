@@ -87,7 +87,7 @@ void SwitchToNextAnimation() {
   // Create a new animation object of the next type.
   current_animation = buildNewAnimation(
                           static_cast<AnimationType>(next_animation_type));
-  Serial.printf("New animation Started (type: %d)\n", next_animation_type);
+  Serial.printf("New animation Started (type: %d)\n\r", next_animation_type);
 
   // Advance to the next animation.
   next_animation_type = (next_animation_type + 1) % NUM_ANIMATION_TYPES;
@@ -139,19 +139,19 @@ void setupFastLED() {
 }
 
 void receivedCallback(uint32_t from, String &msg) {
-  Serial.printf("Received from %d msg=%s\n", from, msg.c_str());
+  Serial.printf("Received from %d msg=%s\n\r", from, msg.c_str());
 }
 
 void newConnectionCallback(bool adopt) {
-  Serial.printf("New Connection, adopt=%d\n", adopt);
+  Serial.printf("New Connection, adopt=%d\n\r", adopt);
 }
 
 void changedConnectionCallback() {
-  Serial.printf("Changed connections %s\n",mesh.subConnectionJson().c_str());
+  Serial.printf("Changed connections %s\n\r",mesh.subConnectionJson().c_str());
 }
 
 void nodeTimeAdjustedCallback(int32_t offset) {
-  Serial.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(),offset);
+  Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh.getNodeTime(),offset);
 }
 
 void setupNetworking() {
@@ -171,7 +171,8 @@ void sendMessage() {
   // the mesh network/etc.  Hanging onto it for a bit until everything's working.
   String msg = "Hello from node ";
   msg += mesh.getNodeId();
-  mesh.sendBroadcast( msg );
+  mesh.sendBroadcast(msg);
+  Serial.printf("I just sent out \"%s\" as a broadcast!\n\r", msg.c_str());
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
 }
 
@@ -218,7 +219,7 @@ void setup() {
   setupFastLED();
   FastLED.setBrightness(16);
 
-//  setupNetworking();
+  setupNetworking();
 
   setupTasks();
 
@@ -231,5 +232,5 @@ void setup() {
 
 void loop() {
   userScheduler.execute();
-//  mesh.update();
+  mesh.update();
 }
