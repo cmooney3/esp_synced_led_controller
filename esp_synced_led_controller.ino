@@ -1,12 +1,21 @@
+// EEPROM libraries so I can leave persistent notes across reboots
+#include <EEPROM.h>
+#define EEPROM_ADDR_OTA_MODE 0
+#define OTA_MODE_ENABLED 0xD7
+#define OTA_MODE_DISABLED 0
+
 // Includes for FastLED controls
 #define FASTLED_INTERNAL  // Supress pragma warnings about not using HW SPI for FastLED control
 #include <FastLED.h>
 
-// Includes/setup for painlessMesh
+// Includes/config for painlessMesh
 #include <painlessMesh.h>
 #define MESH_PREFIX "dummy_prefix"  // TODO: Update these to be better choices, etc
 #define MESH_PASSWORD "dummy_password"
 #define MESH_PORT 34553
+
+// Includes/config for Wifi
+#include "ota.h"
 
 // All the various animations
 #include "animations/drop.h"
@@ -53,7 +62,7 @@ void sendMessage();
 void renderNextFrame();
 void updateBrightness();
 // Build the actual "task" objects that are linked with periods, function pointers/etc
-Task taskSendMessage(TASK_SECOND * 1, TASK_FOREVER, &sendMessage);
+Task taskSendMessage(TASK_SECOND, TASK_FOREVER, &sendMessage);
 Task taskRenderNextFrame(kFrameDelayMS, TASK_FOREVER, &renderNextFrame);
 Task taskUpdateBrightness(kBrightnessUpdateMS, TASK_FOREVER, &updateBrightness);
 
@@ -140,6 +149,12 @@ void setupFastLED() {
 
 void receivedCallback(uint32_t from, String &msg) {
   Serial.printf("Received from %d msg=%s\n\r", from, msg.c_str());
+
+  // Save a bit in the EEPROM and then reboot.  When we reboot the system will check the EEPROM
+  // and boot into OTA mode.
+  EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
+  EEPROM.commit();
+  ESP.restart();
 }
 
 void newConnectionCallback(bool adopt) {
@@ -154,7 +169,7 @@ void nodeTimeAdjustedCallback(int32_t offset) {
   Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh.getNodeTime(),offset);
 }
 
-void setupNetworking() {
+void setupMeshNetworking() {
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
   mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
 
@@ -164,7 +179,6 @@ void setupNetworking() {
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 }
-
 
 void sendMessage() {
   // This is a stupid task that we won't really want in the end, but it's a good way to test
@@ -194,7 +208,6 @@ void updateBrightness() {
     current_brightness = brightness_setting;
   }
 }
-
 void setupTasks() {
   userScheduler.addTask(taskSendMessage);
   taskSendMessage.enable();
@@ -206,7 +219,6 @@ void setupTasks() {
   taskUpdateBrightness.enable();
 }
 
-
 void setup() {
   Serial.begin(kSerialBaudRate);
   Serial.println();
@@ -214,16 +226,47 @@ void setup() {
   Serial.println("ESP8266 Booting now.");
   Serial.println("--------------------------------------------------");
 
+  // Enable use of the EEPROM
+  EEPROM.begin(512);
+
+  // Determine which mode we're booting in by read in a byte from the EEPROM.
+  // If the byte at EEPROM_ADDR_OTA_MODE is set to OTA_MODE_ENABLED at boot,
+  // then instead of the normal booting process we forgo everything apart from
+  // connecting to wifi and waiting for OTA updates.
+  uint8_t boot_mode_byte = EEPROM.read(EEPROM_ADDR_OTA_MODE);
+  bool should_enter_ota_mode = (boot_mode_byte == OTA_MODE_ENABLED);
+  Serial.print("EEPROM Boot mode byte: 0x");
+  Serial.print(boot_mode_byte, HEX);
+  Serial.print("\t(Should enter OTA mode? ");
+  Serial.print(should_enter_ota_mode ? "yes" : "no");
+  Serial.println(")");
+  if (should_enter_ota_mode) {
+    EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_DISABLED);
+    EEPROM.commit();
+    // Wait forever for an Arduino OTA.  This will not return.
+    enter_ota_mode();
+  }
+
+  // If we're here, then we know that we are *not* in OTA mode, and thus
+  // we should continue our setup as usual.
+
+  // Do all the basic GPIO direction setting for buttons, switches, etc...
   setupUI();
 
+  // Set up FastLED to control the actual LEDs.  This makes them enabled but
+  // turns them all off, so it won't start as a big flash of random colors.
   setupFastLED();
   FastLED.setBrightness(16);
 
-  setupNetworking();
+  // Enable mesh networking.  When the mesh network is enabled this controller
+  // can talk to the other nearby controllers.
+  setupMeshNetworking();
 
+  // Set up the task scheduler with our periodic tasks.  These are the main
+  // threads of operation.
   setupTasks();
 
-  // Set up the starting animation
+  // Set up the starting animation  Just pick the first one in the list.
   current_animation = buildNewAnimation(static_cast<AnimationType>(0));
 
   Serial.println("Set up complete!  Entering main program loop now.");
