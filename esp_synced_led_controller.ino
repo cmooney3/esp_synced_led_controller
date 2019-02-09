@@ -186,8 +186,7 @@ void setupMeshNetworking() {
 void sendMessage() {
   // This is a stupid task that we won't really want in the end, but it's a good way to test
   // the mesh network/etc.  Hanging onto it for a bit until everything's working.
-  String msg = "Hello from node ";
-  msg += mesh->getNodeId();
+  String msg = "PROG";
   mesh->sendBroadcast(msg);
   Serial.printf("I just sent out \"%s\" as a broadcast!\n\r", msg.c_str());
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
