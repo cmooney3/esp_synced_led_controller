@@ -2,7 +2,7 @@
 #include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>
 const char* wifi_ssid = "AirCanadaJazz";
-const char* wifi_password = "XXXXXXXXXXX";
+const char* wifi_password = "xxxxxxxx";
 
 // Here lies the code that sets the controller into OTA mode. This means it has
 // to start up Wifi, and then sit there spinning waiting for an OTA
@@ -39,6 +39,7 @@ void waitForOTA() {
     else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    else Serial.println("Mystery Error");
   });
 
   // Start the OTA module up.

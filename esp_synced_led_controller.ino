@@ -55,7 +55,7 @@ static constexpr uint8_t kBrightnessUpdateMS = 250;
 CRGB leds[kNumLEDs];
 
 // Build out the Mesh networking object, the scheduler and the tasks the scheduler runs
-painlessMesh mesh;  // Instantiate a mesh object to get the mesh networking up and running!
+painlessMesh *mesh;
 Scheduler userScheduler; // This is the main scheduler that schedules everything
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
@@ -152,9 +152,12 @@ void receivedCallback(uint32_t from, String &msg) {
 
   // Save a bit in the EEPROM and then reboot.  When we reboot the system will check the EEPROM
   // and boot into OTA mode.
-  EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
-  EEPROM.commit();
-  ESP.restart();
+  if (msg == "PROG") {
+    Serial.printf("Programming command received.  Restarting into OTA mode.");
+    EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
+    EEPROM.commit();
+    ESP.restart();
+  }
 }
 
 void newConnectionCallback(bool adopt) {
@@ -162,30 +165,30 @@ void newConnectionCallback(bool adopt) {
 }
 
 void changedConnectionCallback() {
-  Serial.printf("Changed connections %s\n\r",mesh.subConnectionJson().c_str());
+  Serial.printf("Changed connections %s\n\r",mesh->subConnectionJson().c_str());
 }
 
 void nodeTimeAdjustedCallback(int32_t offset) {
-  Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh.getNodeTime(),offset);
+  Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh->getNodeTime(),offset);
 }
 
 void setupMeshNetworking() {
-  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
+  //mesh->setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
+  mesh->setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  mesh.onReceive(&receivedCallback);
-  mesh.onNewConnection(&newConnectionCallback);
-  mesh.onChangedConnections(&changedConnectionCallback);
-  mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
+  mesh->init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  mesh->onReceive(&receivedCallback);
+  mesh->onNewConnection(&newConnectionCallback);
+  mesh->onChangedConnections(&changedConnectionCallback);
+  mesh->onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 }
 
 void sendMessage() {
   // This is a stupid task that we won't really want in the end, but it's a good way to test
   // the mesh network/etc.  Hanging onto it for a bit until everything's working.
   String msg = "Hello from node ";
-  msg += mesh.getNodeId();
-  mesh.sendBroadcast(msg);
+  msg += mesh->getNodeId();
+  mesh->sendBroadcast(msg);
   Serial.printf("I just sent out \"%s\" as a broadcast!\n\r", msg.c_str());
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
 }
@@ -250,6 +253,12 @@ void setup() {
   // If we're here, then we know that we are *not* in OTA mode, and thus
   // we should continue our setup as usual.
 
+  // Instantiate a mesh object to get the mesh networking up and running!
+  // Note: usually this would be done on the stack, but if you build this
+  // object it starts configuring the network and breaks OTA.  This way it's
+  // only constructed if it's needed.
+  mesh = new painlessMesh;
+
   // Do all the basic GPIO direction setting for buttons, switches, etc...
   setupUI();
 
@@ -275,5 +284,5 @@ void setup() {
 
 void loop() {
   userScheduler.execute();
-  mesh.update();
+  mesh->update();
 }
