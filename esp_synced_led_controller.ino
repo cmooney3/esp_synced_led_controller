@@ -15,6 +15,8 @@
 extern const char* mesh_password;
 #include "passwords/mesh_password.h"
 
+String kProgrammingMsg = "PROG";
+
 // Includes/config for Wifi
 #include "ota.h"
 bool is_ota_mode = false;
@@ -53,6 +55,9 @@ static constexpr uint8_t kFrameDelayMS = 20; // How long to delay (in MS) betwee
 // How frequently should we be checking for new brightness levels
 static constexpr uint8_t kBrightnessUpdateMS = 250;
 
+// How long to wait in between checking the serial port for input
+static constexpr uint8_t kSerialPollPeriodMS = 500;
+
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
 
@@ -62,11 +67,13 @@ Scheduler userScheduler; // This is the main scheduler that schedules everything
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
 void renderNextFrame();
+void checkSerial();
 void updateBrightness();
 // Build the actual "task" objects that are linked with periods, function pointers/etc
 Task taskSendMessage(TASK_SECOND, TASK_FOREVER, &sendMessage);
 Task taskRenderNextFrame(kFrameDelayMS, TASK_FOREVER, &renderNextFrame);
 Task taskUpdateBrightness(kBrightnessUpdateMS, TASK_FOREVER, &updateBrightness);
+Task taskCheckSerial(kSerialPollPeriodMS, TASK_FOREVER, &checkSerial);
 
 
 // Here we define the list of animations that the controller can play
@@ -148,7 +155,7 @@ void receivedCallback(uint32_t from, String &msg) {
 
   // Save a bit in the EEPROM and then reboot.  When we reboot the system will check the EEPROM
   // and boot into OTA mode.
-  if (msg == "PROG") {
+  if (msg == kProgrammingMsg) {
     Serial.printf("Programming command received.  Restarting into OTA mode.");
     EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
     EEPROM.commit();
@@ -200,6 +207,27 @@ void renderNextFrame() {
   }
 }
 
+void checkSerial() {
+  if (Serial.available() > 0) {
+    String input_str = Serial.readString();
+
+    Serial.print("Serial Recieved: '");
+    Serial.print(input_str);
+    Serial.println("'!");
+
+    if (input_str == kProgrammingMsg) {
+      Serial.print("Entering Program Mode.  Broadcasting for you now.");
+      for (int i = 0; i < 10; i++) {
+        // TODO: Send out the Programming message to everyone before resetting itself
+        mesh.sendBroadcast(kProgrammingMsg);
+
+      // Super hacky -- this callback is the received callback so it acts like
+      // it received the same message.
+      receivedCallback(0, kProgrammingMsg);
+    }
+  }
+}
+
 void updateBrightness() {
   // Update FastLED's brightness setting if the user changed it.
   if (brightness_setting != current_brightness) {
@@ -216,6 +244,9 @@ void setupTasks() {
 
   userScheduler.addTask(taskUpdateBrightness);
   taskUpdateBrightness.enable();
+
+  userScheduler.addTask(taskCheckSerial);
+  taskCheckSerial.enable();
 }
 
 void setup() {
