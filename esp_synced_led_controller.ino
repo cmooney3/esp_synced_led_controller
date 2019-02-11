@@ -16,6 +16,7 @@
 
 // Includes/config for Wifi
 #include "ota.h"
+bool is_ota_mode = false;
 
 // All the various animations
 #include "animations/drop.h"
@@ -237,52 +238,60 @@ void setup() {
   // then instead of the normal booting process we forgo everything apart from
   // connecting to wifi and waiting for OTA updates.
   uint8_t boot_mode_byte = EEPROM.read(EEPROM_ADDR_OTA_MODE);
-  bool should_enter_ota_mode = (boot_mode_byte == OTA_MODE_ENABLED);
+  is_ota_mode = (boot_mode_byte == OTA_MODE_ENABLED);
   Serial.print("EEPROM Boot mode byte: 0x");
   Serial.print(boot_mode_byte, HEX);
   Serial.print("\t(Should enter OTA mode? ");
-  Serial.print(should_enter_ota_mode ? "yes" : "no");
+  Serial.print(is_ota_mode ? "yes" : "no");
   Serial.println(")");
-  if (should_enter_ota_mode) {
+  if (is_ota_mode) {
     EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_DISABLED);
     EEPROM.commit();
-    // Wait forever for an Arduino OTA.  This will not return.
-    enter_ota_mode();
+    // Start up wifi instead and connect to the access point.
+    setupWifi();
+
+    // Set up OTA and wait indefinitely doing nothing but checking for OTA updates.
+    setupArduinoOTA();
+  } else {
+    // If we're here, then we know that we are *not* in OTA mode, and thus
+    // we should continue our setup as usual.
+
+    // Instantiate a mesh object to get the mesh networking up and running!
+    // Note: usually this would be done on the stack, but if you build this
+    // object it starts configuring the network and breaks OTA.  This way it's
+    // only constructed if it's needed.
+    mesh = new painlessMesh;
+
+    // Do all the basic GPIO direction setting for buttons, switches, etc...
+    setupUI();
+
+    // Set up FastLED to control the actual LEDs.  This makes them enabled but
+    // turns them all off, so it won't start as a big flash of random colors.
+    setupFastLED();
+    FastLED.setBrightness(16);
+
+    // Enable mesh networking.  When the mesh network is enabled this controller
+    // can talk to the other nearby controllers.
+    setupMeshNetworking();
+
+    // Set up the task scheduler with our periodic tasks.  These are the main
+    // threads of operation.
+    setupTasks();
+
+    // Set up the starting animation  Just pick the first one in the list.
+    current_animation = buildNewAnimation(static_cast<AnimationType>(0));
+
+    Serial.println("Set up complete!  Entering main program loop now.");
+    Serial.println();
   }
-
-  // If we're here, then we know that we are *not* in OTA mode, and thus
-  // we should continue our setup as usual.
-
-  // Instantiate a mesh object to get the mesh networking up and running!
-  // Note: usually this would be done on the stack, but if you build this
-  // object it starts configuring the network and breaks OTA.  This way it's
-  // only constructed if it's needed.
-  mesh = new painlessMesh;
-
-  // Do all the basic GPIO direction setting for buttons, switches, etc...
-  setupUI();
-
-  // Set up FastLED to control the actual LEDs.  This makes them enabled but
-  // turns them all off, so it won't start as a big flash of random colors.
-  setupFastLED();
-  FastLED.setBrightness(16);
-
-  // Enable mesh networking.  When the mesh network is enabled this controller
-  // can talk to the other nearby controllers.
-  setupMeshNetworking();
-
-  // Set up the task scheduler with our periodic tasks.  These are the main
-  // threads of operation.
-  setupTasks();
-
-  // Set up the starting animation  Just pick the first one in the list.
-  current_animation = buildNewAnimation(static_cast<AnimationType>(0));
-
-  Serial.println("Set up complete!  Entering main program loop now.");
-  Serial.println();
 }
 
 void loop() {
-  userScheduler.execute();
-  mesh->update();
+  if (is_ota_mode) {
+    Serial.println("Handling ArduinoOTA...");
+    ArduinoOTA.handle();
+  } else {
+    userScheduler.execute();
+    mesh->update();
+  }
 }
