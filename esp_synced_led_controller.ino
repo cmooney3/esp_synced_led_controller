@@ -10,12 +10,14 @@
 
 // Includes/config for painlessMesh
 #include <painlessMesh.h>
-#define MESH_PREFIX "dummy_prefix"  // TODO: Update these to be better choices, etc
-#define MESH_PASSWORD "dummy_password"
 #define MESH_PORT 34553
+#define MESH_PREFIX "esp_synced_leds_mesh"
+extern const char* mesh_password;
+#include "passwords/mesh_password.h"
 
 // Includes/config for Wifi
 #include "ota.h"
+bool is_ota_mode = false;
 
 // All the various animations
 #include "animations/drop.h"
@@ -55,7 +57,7 @@ static constexpr uint8_t kBrightnessUpdateMS = 250;
 CRGB leds[kNumLEDs];
 
 // Build out the Mesh networking object, the scheduler and the tasks the scheduler runs
-painlessMesh *mesh;
+painlessMesh mesh;
 Scheduler userScheduler; // This is the main scheduler that schedules everything
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
@@ -133,16 +135,10 @@ void setupUI() {
 void setupFastLED() {
   // LED setup for the RGB LEDs it's going to control
   Serial.println("* Configuring FastLED.");
-  Serial.println("  - Type: " xstr(LED_TYPE));
-  Serial.print("  - Pin: ");
-  Serial.println(kLEDPin);
-  Serial.print("  - Number of LEDs: ");
-  Serial.println(kNumLEDs);
-  Serial.print("  - Brightness (out of 255): ");
-  Serial.println(brightnesses[brightness_setting]);
-  pinMode(kLEDPin, OUTPUT);
   FastLED.addLeds<LED_TYPE, kLEDPin, RGB>(leds, kNumLEDs);
+
   FastLED.setBrightness(brightnesses[brightness_setting]);
+
   fill_solid(leds, kNumLEDs, CRGB::Black);
   FastLED.show();
 }
@@ -165,29 +161,29 @@ void newConnectionCallback(bool adopt) {
 }
 
 void changedConnectionCallback() {
-  Serial.printf("Changed connections %s\n\r",mesh->subConnectionJson().c_str());
+  Serial.printf("Changed connections %s\n\r",mesh.subConnectionJson().c_str());
 }
 
 void nodeTimeAdjustedCallback(int32_t offset) {
-  Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh->getNodeTime(),offset);
+  Serial.printf("Adjusted time %u. Offset = %d\n\r", mesh.getNodeTime(),offset);
 }
 
 void setupMeshNetworking() {
-  //mesh->setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh->setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
+  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
+  mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
 
-  mesh->init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
-  mesh->onReceive(&receivedCallback);
-  mesh->onNewConnection(&newConnectionCallback);
-  mesh->onChangedConnections(&changedConnectionCallback);
-  mesh->onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
+  mesh.init(MESH_PREFIX, mesh_password, &userScheduler, MESH_PORT);
+  mesh.onReceive(&receivedCallback);
+  mesh.onNewConnection(&newConnectionCallback);
+  mesh.onChangedConnections(&changedConnectionCallback);
+  mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 }
 
 void sendMessage() {
   // This is a stupid task that we won't really want in the end, but it's a good way to test
   // the mesh network/etc.  Hanging onto it for a bit until everything's working.
   String msg = "PROG";
-  mesh->sendBroadcast(msg);
+  mesh.sendBroadcast(msg);
   Serial.printf("I just sent out \"%s\" as a broadcast!\n\r", msg.c_str());
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
 }
@@ -236,52 +232,54 @@ void setup() {
   // then instead of the normal booting process we forgo everything apart from
   // connecting to wifi and waiting for OTA updates.
   uint8_t boot_mode_byte = EEPROM.read(EEPROM_ADDR_OTA_MODE);
-  bool should_enter_ota_mode = (boot_mode_byte == OTA_MODE_ENABLED);
+  is_ota_mode = (boot_mode_byte == OTA_MODE_ENABLED);
   Serial.print("EEPROM Boot mode byte: 0x");
   Serial.print(boot_mode_byte, HEX);
   Serial.print("\t(Should enter OTA mode? ");
-  Serial.print(should_enter_ota_mode ? "yes" : "no");
+  Serial.print(is_ota_mode ? "yes" : "no");
   Serial.println(")");
-  if (should_enter_ota_mode) {
+  if (is_ota_mode) {
     EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_DISABLED);
     EEPROM.commit();
-    // Wait forever for an Arduino OTA.  This will not return.
-    enter_ota_mode();
+    // Start up wifi instead and connect to the access point.
+    setupWifi();
+
+    // Set up OTA and wait indefinitely doing nothing but checking for OTA updates.
+    setupArduinoOTA();
+  } else {
+    // If we're here, then we know that we are *not* in OTA mode, and thus
+    // we should continue our setup as usual.
+
+    // Do all the basic GPIO direction setting for buttons, switches, etc...
+    setupUI();
+
+    // Set up FastLED to control the actual LEDs.  This makes them enabled but
+    // turns them all off, so it won't start as a big flash of random colors.
+    setupFastLED();
+    FastLED.setBrightness(16);
+
+    // Enable mesh networking.  When the mesh network is enabled this controller
+    // can talk to the other nearby controllers.
+    setupMeshNetworking();
+
+    // Set up the task scheduler with our periodic tasks.  These are the main
+    // threads of operation.
+    setupTasks();
+
+    // Set up the starting animation  Just pick the first one in the list.
+    current_animation = buildNewAnimation(static_cast<AnimationType>(0));
+
+    Serial.println("Set up complete!  Entering main program loop now.");
+    Serial.println();
   }
-
-  // If we're here, then we know that we are *not* in OTA mode, and thus
-  // we should continue our setup as usual.
-
-  // Instantiate a mesh object to get the mesh networking up and running!
-  // Note: usually this would be done on the stack, but if you build this
-  // object it starts configuring the network and breaks OTA.  This way it's
-  // only constructed if it's needed.
-  mesh = new painlessMesh;
-
-  // Do all the basic GPIO direction setting for buttons, switches, etc...
-  setupUI();
-
-  // Set up FastLED to control the actual LEDs.  This makes them enabled but
-  // turns them all off, so it won't start as a big flash of random colors.
-  setupFastLED();
-  FastLED.setBrightness(16);
-
-  // Enable mesh networking.  When the mesh network is enabled this controller
-  // can talk to the other nearby controllers.
-  setupMeshNetworking();
-
-  // Set up the task scheduler with our periodic tasks.  These are the main
-  // threads of operation.
-  setupTasks();
-
-  // Set up the starting animation  Just pick the first one in the list.
-  current_animation = buildNewAnimation(static_cast<AnimationType>(0));
-
-  Serial.println("Set up complete!  Entering main program loop now.");
-  Serial.println();
 }
 
 void loop() {
-  userScheduler.execute();
-  mesh->update();
+  if (is_ota_mode) {
+    Serial.println("Handling ArduinoOTA...");
+    ArduinoOTA.handle();
+  } else {
+    userScheduler.execute();
+    mesh.update();
+  }
 }
