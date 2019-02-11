@@ -220,6 +220,7 @@ void checkSerial() {
       for (int i = 0; i < 10; i++) {
         // TODO: Send out the Programming message to everyone before resetting itself
         mesh.sendBroadcast(kProgrammingMsg);
+      }
 
       // Super hacky -- this callback is the received callback so it acts like
       // it received the same message.
