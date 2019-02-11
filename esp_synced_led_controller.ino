@@ -10,9 +10,10 @@
 
 // Includes/config for painlessMesh
 #include <painlessMesh.h>
-#define MESH_PREFIX "dummy_prefix"  // TODO: Update these to be better choices, etc
-#define MESH_PASSWORD "dummy_password"
 #define MESH_PORT 34553
+#define MESH_PREFIX "esp_synced_leds_mesh"
+extern const char* mesh_password;
+#include "passwords/mesh_password.h"
 
 // Includes/config for Wifi
 #include "ota.h"
@@ -171,7 +172,7 @@ void setupMeshNetworking() {
   //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
   mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT);
+  mesh.init(MESH_PREFIX, mesh_password, &userScheduler, MESH_PORT);
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);

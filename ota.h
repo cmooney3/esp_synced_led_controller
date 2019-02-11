@@ -3,8 +3,9 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
-const char* ssid = "AirCanadaJazz";
-const char* password = "xxxxxxxxxx";
+const char* wifi_ssid = "AirCanadaJazz";
+extern const char* wifi_password;
+#include "passwords/wifi_password.h"
 
 // Here lies the code that sets the controller into OTA mode. This means it has
 // to start up Wifi, and then sit there spinning waiting for an OTA
@@ -13,7 +14,7 @@ const char* password = "xxxxxxxxxx";
 bool setupWifi() {
   // Connect to the wifi access point configured at the top of this file.
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(wifi_ssid, wifi_password);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
     delay(5000);

@@ -98,7 +98,8 @@ function compile {
   # Check to make sure the Mesh password exists.  We can't build without them
   # because it's required information for connecting to the mesh network.
   # TODO -- uncomment this and actually use this password.
-  # create_password_file_if_needed "mesh"
+  create_password_file_if_needed "mesh"
+  create_password_file_if_needed "wifi"
 
   # Compilation command
   JAVA_TOOL_OPTIONS='-Djava.awt.headless=true' "${ARDUINO}" "${ACTION}" \
