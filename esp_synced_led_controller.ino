@@ -58,7 +58,7 @@ CRGB leds[kNumLEDs];
 painlessMesh mesh;
 
 // Set up our scheduler and the tasks that the scheduler runs
-Scheduler userScheduler;
+Scheduler scheduler;
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
 void renderNextFrame();
@@ -196,7 +196,7 @@ void setupMeshNetworking() {
   // ERROR MESH_STATUS CONNECTION SYNC COMMUNICATION GENERAL MSG_TYPES REMOTE
 
   // Initialize the mesh.
-  mesh.init(MESH_PREFIX, mesh_password, &userScheduler, MESH_PORT);
+  mesh.init(MESH_PREFIX, mesh_password, &scheduler, MESH_PORT);
 
   // Configure the callbacks
   mesh.onReceive(&handleIncomingMeshMessage);
@@ -310,7 +310,7 @@ void setup() {
     // For OTA mode there is basically only one thing we do -- just check for updates.
     // This simple task is the only one that will run in this mode, and essentially
     // just makes the main loop spin forever waiting on an update.
-    userScheduler.addTask(taskArduinoOTA);
+    scheduler.addTask(taskArduinoOTA);
     taskArduinoOTA.enable();
   } else {
     // If we're in here, then that means we're booting the system into the
@@ -329,19 +329,19 @@ void setup() {
 
     // Set up the periodic tasks for normal operation.
     // This task sends a periodic message -- used only to test/debug the mesh.
-    userScheduler.addTask(taskSendMessage);
+    scheduler.addTask(taskSendMessage);
     taskSendMessage.enable();
     // This task renders the actual frames of the animation.
-    userScheduler.addTask(taskRenderNextFrame);
+    scheduler.addTask(taskRenderNextFrame);
     taskRenderNextFrame.enable();
     // This task polls the brightness button and updates the brightness.
-    userScheduler.addTask(taskUpdateBrightness);
+    scheduler.addTask(taskUpdateBrightness);
     taskUpdateBrightness.enable();
     // This task polls the serial input looking for the "PROG" command.
-    userScheduler.addTask(taskCheckSerial);
+    scheduler.addTask(taskCheckSerial);
     taskCheckSerial.enable();
     // Do the required mesh network maintenance.
-    userScheduler.addTask(taskUpdateMesh);
+    scheduler.addTask(taskUpdateMesh);
     taskUpdateMesh.enable();
 
     // Set up the starting animation  Just pick the first one in the list.
@@ -354,5 +354,5 @@ void setup() {
 
 void loop() {
   // The loop function should be handled entirely by the task scheduler.
-  userScheduler.execute();
+  scheduler.execute();
 }
