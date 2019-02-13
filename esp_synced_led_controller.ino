@@ -50,30 +50,37 @@ static constexpr uint32_t kSerialBaudRate = 115200;
 
 // Animation settings
 static constexpr uint16_t kNumFrames = 300; // How many frames each animation gets to run for (duration)
-static constexpr uint8_t kFrameDelayMS = 20; // How long to delay (in MS) between generating frames
-
-// How frequently should we be checking for new brightness levels
-static constexpr uint8_t kBrightnessUpdateMS = 250;
-
-// How long to wait in between checking the serial port for input
-static constexpr uint8_t kSerialPollPeriodMS = 500;
 
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
 
-// Build out the Mesh networking object, the scheduler and the tasks the scheduler runs
+// Create the actual mesh networking object for the mesh network.
 painlessMesh mesh;
-Scheduler userScheduler; // This is the main scheduler that schedules everything
+
+// Set up our scheduler and the tasks that the scheduler runs
+Scheduler userScheduler;
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
 void renderNextFrame();
 void checkSerial();
 void updateBrightness();
+void handleArduinoOTA();
+void updateMesh();
+// The periods for each of these tasks in milliseconds
+static constexpr uint8_t kFrameGenerationPeriodMS = 20;
+static constexpr uint8_t kBrightnessUpdatePeriodMS = 250;
+static constexpr uint8_t kSerialPollPeriodMS = 500;
+static constexpr uint8_t kArduinoOTAPeriodMS = 20;
+static constexpr uint8_t kMeshUpdatePeriodMS = 250;
 // Build the actual "task" objects that are linked with periods, function pointers/etc
+// These Tasks have to be added to the scheduler and enabled before they run, so not all
+// of these tasks are enabled at once just because they appear here.
 Task taskSendMessage(TASK_SECOND, TASK_FOREVER, &sendMessage);
-Task taskRenderNextFrame(kFrameDelayMS, TASK_FOREVER, &renderNextFrame);
-Task taskUpdateBrightness(kBrightnessUpdateMS, TASK_FOREVER, &updateBrightness);
+Task taskRenderNextFrame(kFrameGenerationPeriodMS, TASK_FOREVER, &renderNextFrame);
+Task taskUpdateBrightness(kBrightnessUpdatePeriodMS, TASK_FOREVER, &updateBrightness);
 Task taskCheckSerial(kSerialPollPeriodMS, TASK_FOREVER, &checkSerial);
+Task taskArduinoOTA(kArduinoOTAPeriodMS, TASK_FOREVER, &handleArduinoOTA);
+Task taskUpdateMesh(kMeshUpdatePeriodMS, TASK_FOREVER, &updateMesh);
 
 
 // Here we define the list of animations that the controller can play
@@ -140,17 +147,20 @@ void setupUI() {
 }
 
 void setupFastLED() {
-  // LED setup for the RGB LEDs it's going to control
+  // Configure FastLED for the main RGB LED strip that this unit controls
   Serial.println("* Configuring FastLED.");
   FastLED.addLeds<LED_TYPE, kLEDPin, RGB>(leds, kNumLEDs);
 
+  // Set a starting brightness
   FastLED.setBrightness(brightnesses[brightness_setting]);
 
+  // Set all the LEDs to black (aka off) so that the LEDs don't flash random colors
+  // on boot
   fill_solid(leds, kNumLEDs, CRGB::Black);
   FastLED.show();
 }
 
-void receivedCallback(uint32_t from, String &msg) {
+void handleIncomingMeshMessage(uint32_t from, String &msg) {
   Serial.printf("Received from %d msg=%s\n\r", from, msg.c_str());
 
   // Save a bit in the EEPROM and then reboot.  When we reboot the system will check the EEPROM
@@ -176,11 +186,20 @@ void nodeTimeAdjustedCallback(int32_t offset) {
 }
 
 void setupMeshNetworking() {
-  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
-  mesh.setDebugMsgTypes(ERROR | STARTUP);  // set before init() so that you can see startup messages
+  // To set up the mesh network, you need to configure several callbacks.  This
+  // function sets up those callbacks.
 
+  // Configure which kinds of debugging messages PainlessMesh should show us on serial.
+  // Note, we setDebugMsgTypes() before init() so that you can see startup messages.
+  mesh.setDebugMsgTypes(ERROR | STARTUP);
+  // Availible Mesh debugging message types are:
+  // ERROR MESH_STATUS CONNECTION SYNC COMMUNICATION GENERAL MSG_TYPES REMOTE
+
+  // Initialize the mesh.
   mesh.init(MESH_PREFIX, mesh_password, &userScheduler, MESH_PORT);
-  mesh.onReceive(&receivedCallback);
+
+  // Configure the callbacks
+  mesh.onReceive(&handleIncomingMeshMessage);
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
@@ -208,9 +227,11 @@ void renderNextFrame() {
 }
 
 void checkSerial() {
+  // Check to see if someone has sent the magic kProgrammingMsg to us over Serial.
+  // It it has, broadcast the programming message out to everyone on the mesh network
+  // and then reboot into OTA mode.
   if (Serial.available() > 0) {
     String input_str = Serial.readString();
-
     Serial.print("Serial Recieved: '");
     Serial.print(input_str);
     Serial.println("'!");
@@ -224,7 +245,7 @@ void checkSerial() {
 
       // Super hacky -- this callback is the received callback so it acts like
       // it received the same message.
-      receivedCallback(0, kProgrammingMsg);
+      handleIncomingMeshMessage(0, kProgrammingMsg);
     }
   }
 }
@@ -236,18 +257,14 @@ void updateBrightness() {
     current_brightness = brightness_setting;
   }
 }
-void setupTasks() {
-  userScheduler.addTask(taskSendMessage);
-  taskSendMessage.enable();
 
-  userScheduler.addTask(taskRenderNextFrame);
-  taskRenderNextFrame.enable();
+void handleArduinoOTA() {
+  Serial.println("Handling ArduinoOTA...");
+  ArduinoOTA.handle();
+}
 
-  userScheduler.addTask(taskUpdateBrightness);
-  taskUpdateBrightness.enable();
-
-  userScheduler.addTask(taskCheckSerial);
-  taskCheckSerial.enable();
+void updateMesh() {
+  mesh.update();
 }
 
 void setup() {
@@ -271,17 +288,33 @@ void setup() {
   Serial.print("\t(Should enter OTA mode? ");
   Serial.print(is_ota_mode ? "yes" : "no");
   Serial.println(")");
+
+  // Depending on which mode we're booting into, there are slightly different
+  // steps for setting up.  Plus, each mode builds a different set of tasks to
+  // run in our scheduler which really changes the behavior of each mode.
   if (is_ota_mode) {
+    // If we're in here, then that means we're booting the system into OTA-mode
+
+    // Make sure to change the eeprom OTA-mode switch off, so the next reboot
+    // goes into regular-mode.
     EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_DISABLED);
     EEPROM.commit();
-    // Start up wifi instead and connect to the access point.
+
+    // Start up standard Wifi (not a mesh network)
     setupWifi();
 
-    // Set up OTA and wait indefinitely doing nothing but checking for OTA updates.
+    // Set up the AndroidOTA callbacks and configure the library
     setupArduinoOTA();
+
+    // Configure the tasks for OTA mode with our task scheduler.
+    // For OTA mode there is basically only one thing we do -- just check for updates.
+    // This simple task is the only one that will run in this mode, and essentially
+    // just makes the main loop spin forever waiting on an update.
+    userScheduler.addTask(taskArduinoOTA);
+    taskArduinoOTA.enable();
   } else {
-    // If we're here, then we know that we are *not* in OTA mode, and thus
-    // we should continue our setup as usual.
+    // If we're in here, then that means we're booting the system into the
+    // normal mode where the device syncs on a mesh network and renders animations.
 
     // Do all the basic GPIO direction setting for buttons, switches, etc...
     setupUI();
@@ -289,15 +322,27 @@ void setup() {
     // Set up FastLED to control the actual LEDs.  This makes them enabled but
     // turns them all off, so it won't start as a big flash of random colors.
     setupFastLED();
-    FastLED.setBrightness(16);
 
     // Enable mesh networking.  When the mesh network is enabled this controller
     // can talk to the other nearby controllers.
     setupMeshNetworking();
 
-    // Set up the task scheduler with our periodic tasks.  These are the main
-    // threads of operation.
-    setupTasks();
+    // Set up the periodic tasks for normal operation.
+    // This task sends a periodic message -- used only to test/debug the mesh.
+    userScheduler.addTask(taskSendMessage);
+    taskSendMessage.enable();
+    // This task renders the actual frames of the animation.
+    userScheduler.addTask(taskRenderNextFrame);
+    taskRenderNextFrame.enable();
+    // This task polls the brightness button and updates the brightness.
+    userScheduler.addTask(taskUpdateBrightness);
+    taskUpdateBrightness.enable();
+    // This task polls the serial input looking for the "PROG" command.
+    userScheduler.addTask(taskCheckSerial);
+    taskCheckSerial.enable();
+    // Do the required mesh network maintenance.
+    userScheduler.addTask(taskUpdateMesh);
+    taskUpdateMesh.enable();
 
     // Set up the starting animation  Just pick the first one in the list.
     current_animation = buildNewAnimation(static_cast<AnimationType>(0));
@@ -308,11 +353,6 @@ void setup() {
 }
 
 void loop() {
-  if (is_ota_mode) {
-    Serial.println("Handling ArduinoOTA...");
-    ArduinoOTA.handle();
-  } else {
-    userScheduler.execute();
-    mesh.update();
-  }
+  // The loop function should be handled entirely by the task scheduler.
+  userScheduler.execute();
 }
