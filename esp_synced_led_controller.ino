@@ -21,12 +21,6 @@ String kProgrammingMsg = "PROG";
 #include "ota.h"
 bool is_ota_mode = false;
 
-// All the various animations
-#include "animations/drop.h"
-#include "animations/pulse.h"
-#include "animations/rainbow.h"
-
-
 // The Pin assignments for the various peripherals attached to the board.
 static constexpr uint8_t kButtonPin = 0;
 static constexpr uint8_t kSwitchPin = 14;
@@ -58,6 +52,9 @@ static constexpr uint16_t kNumFrames = 300; // How many frames each animation ge
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
 
+// All the animation stuff
+#include "animationHandler.h"
+
 // Create the actual mesh networking object for the mesh network.
 painlessMesh mesh;
 
@@ -88,42 +85,6 @@ Task taskCheckSerial(kSerialPollPeriodMS, TASK_FOREVER, &checkSerial);
 Task taskArduinoOTA(kArduinoOTAPeriodMS, TASK_FOREVER, &handleArduinoOTA);
 Task taskUpdateMesh(kMeshUpdatePeriodMS, TASK_FOREVER, &updateMesh);
 Task taskSendProgrammingMessage(kProgrammingTriggerPeriodMS, TASK_FOREVER, &sendProgrammingMessge);
-
-
-// Here we define the list of animations that the controller can play
-// by building up an enum full of their names and a generator function
-// that returns a generic Animation* give the type of animation.
-// When adding a new animation, this is where you do the book-keeping.
-enum AnimationType {ANIM_DROP, ANIM_RAINBOW, ANIM_PULSE, NUM_ANIMATION_TYPES} typedef AnimationType;
-Animation* buildNewAnimation(AnimationType type) {
-  switch (type) {
-    case AnimationType::ANIM_PULSE:
-      return new Pulse::PulseAnimation(leds, kNumLEDs, kNumFrames);
-    case AnimationType::ANIM_RAINBOW:
-      return new Rainbow::RainbowAnimation(leds, kNumLEDs, kNumFrames);
-    case AnimationType::ANIM_DROP:
-      return new Drop::DropAnimation(leds, kNumLEDs, kNumFrames);
-    default:
-      return NULL;
-  }
-}
-Animation* current_animation;
-
-void SwitchToNextAnimation() {
-  static uint8_t next_animation_type = 0;
-  // First, avoid memory leaks by deleting the animation that's ending.
-  if (current_animation) {
-    delete current_animation;
-  }
-
-  // Create a new animation object of the next type.
-  current_animation = buildNewAnimation(
-                          static_cast<AnimationType>(next_animation_type));
-  Serial.printf("New animation Started (type: %d)\n\r", next_animation_type);
-
-  // Advance to the next animation.
-  next_animation_type = (next_animation_type + 1) % NUM_ANIMATION_TYPES;
-}
 
 // Interrupt handler for the brightness button.
 // This works by setting the brightness_setting value with a new value.
@@ -239,17 +200,6 @@ void sendMessage() {
   mesh.sendBroadcast(msg);
   Serial.printf("I just sent out \"%s\" as a broadcast!\n\r", msg.c_str());
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
-}
-
-void renderNextFrame() {
-  // Render the next frame
-  bool has_more_frames = current_animation->nextFrame();
-  FastLED.show();
-
-  // If that was the last frame of the animation, queue up the next one
-  if (!has_more_frames) {
-    SwitchToNextAnimation();
-  }
 }
 
 void checkSerial() {
