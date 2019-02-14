@@ -32,6 +32,10 @@ static constexpr uint8_t kButtonPin = 0;
 static constexpr uint8_t kSwitchPin = 14;
 static constexpr uint8_t kLEDPin = 5;
 
+// When the unit is switched into programming mode how many times should it send out the
+// programming trigger to all the other members of the mesh before rebooting itself
+#define NUM_PROGRAMMING_BROADCASTS_BEFORE_REBOOT 20
+
 // Debounce configurations for the buttons
 constexpr int kBtnBounceTimeMS = 200;
 
@@ -66,12 +70,14 @@ void checkSerial();
 void updateBrightness();
 void handleArduinoOTA();
 void updateMesh();
+void sendProgrammingMessge();
 // The periods for each of these tasks in milliseconds
 static constexpr uint8_t kFrameGenerationPeriodMS = 20;
 static constexpr uint8_t kBrightnessUpdatePeriodMS = 250;
 static constexpr uint8_t kSerialPollPeriodMS = 500;
 static constexpr uint8_t kArduinoOTAPeriodMS = 20;
 static constexpr uint8_t kMeshUpdatePeriodMS = 250;
+static constexpr uint8_t kProgrammingTriggerPeriodMS = 2000;
 // Build the actual "task" objects that are linked with periods, function pointers/etc
 // These Tasks have to be added to the scheduler and enabled before they run, so not all
 // of these tasks are enabled at once just because they appear here.
@@ -81,6 +87,7 @@ Task taskUpdateBrightness(kBrightnessUpdatePeriodMS, TASK_FOREVER, &updateBright
 Task taskCheckSerial(kSerialPollPeriodMS, TASK_FOREVER, &checkSerial);
 Task taskArduinoOTA(kArduinoOTAPeriodMS, TASK_FOREVER, &handleArduinoOTA);
 Task taskUpdateMesh(kMeshUpdatePeriodMS, TASK_FOREVER, &updateMesh);
+Task taskSendProgrammingMessage(kProgrammingTriggerPeriodMS, TASK_FOREVER, &sendProgrammingMessge);
 
 
 // Here we define the list of animations that the controller can play
@@ -173,6 +180,25 @@ void handleIncomingMeshMessage(uint32_t from, String &msg) {
   }
 }
 
+void sendProgrammingMessge() {
+  static uint8_t sends_remaining = NUM_PROGRAMMING_BROADCASTS_BEFORE_REBOOT;
+  Serial.print("Programming broadcast #");
+  Serial.print(sends_remaining);
+  Serial.print(": \"");
+  Serial.print(kProgrammingMsg);
+  Serial.println("\"");
+
+  mesh.sendBroadcast(kProgrammingMsg);
+
+  sends_remaining--;
+
+  // Super hacky -- this callback is the received callback so it acts like
+  // it received the same message itself.
+  if (sends_remaining == 0) {
+    handleIncomingMeshMessage(0, kProgrammingMsg);
+  }
+}
+
 void newConnectionCallback(bool adopt) {
   Serial.printf("New Connection, adopt=%d\n\r", adopt);
 }
@@ -237,15 +263,11 @@ void checkSerial() {
     Serial.println("'!");
 
     if (input_str == kProgrammingMsg) {
-      Serial.print("Entering Program Mode.  Broadcasting for you now.");
-      for (int i = 0; i < 10; i++) {
-        // TODO: Send out the Programming message to everyone before resetting itself
-        mesh.sendBroadcast(kProgrammingMsg);
-      }
-
-      // Super hacky -- this callback is the received callback so it acts like
-      // it received the same message.
-      handleIncomingMeshMessage(0, kProgrammingMsg);
+      // If we've gotten the right message enable the programming message task.  It
+      // will handle the rest of the progrss itself.
+      Serial.print("Entering Program Mode.  Broadcasting the message out first...");
+      scheduler.addTask(taskSendProgrammingMessage);
+      taskSendProgrammingMessage.enable();
     }
   }
 }
