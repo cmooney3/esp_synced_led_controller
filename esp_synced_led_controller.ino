@@ -134,10 +134,7 @@ void handleIncomingMeshMessage(uint32_t from, String &msg) {
   // Save a bit in the EEPROM and then reboot.  When we reboot the system will check the EEPROM
   // and boot into OTA mode.
   if (msg == kProgrammingMsg) {
-    Serial.printf("Programming command received.  Restarting into OTA mode.");
-    EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
-    EEPROM.commit();
-    ESP.restart();
+    broadcastProgrammingMessagesBeforeRebootingIntoOTAMode();
   }
 }
 
@@ -153,10 +150,10 @@ void sendProgrammingMessge() {
 
   sends_remaining--;
 
-  // Super hacky -- this callback is the received callback so it acts like
-  // it received the same message itself.
+  // After sending out all the messages, reboot yourself.
   if (sends_remaining == 0) {
-    handleIncomingMeshMessage(0, kProgrammingMsg);
+    Serial.printf("Rebooting myself into OTA mode now.");
+    ESP.restart();
   }
 }
 
@@ -202,6 +199,26 @@ void sendMessage() {
   taskSendMessage.setInterval(random( TASK_SECOND * 1, TASK_SECOND * 5));
 }
 
+void broadcastProgrammingMessagesBeforeRebootingIntoOTAMode() {
+  // Start this process by enabling  the programming message task.  It
+  // will handle the rest of the steps itself.
+  // This check makes sure that we only start the task one time.
+  static bool has_started_broadcasting_already = false;
+  if (!has_started_broadcasting_already) {
+    Serial.print("Entering OTA Mode.  Broadcasting the message out first...");
+    
+    // Mark down in EEPROM that we should boot into OTA mode on the next reboot.
+    EEPROM.write(EEPROM_ADDR_OTA_MODE, OTA_MODE_ENABLED);
+    EEPROM.commit();
+
+    // Enable a task to send out messages and eventually reboot this device.
+    scheduler.addTask(taskSendProgrammingMessage);
+    taskSendProgrammingMessage.enable();
+
+    has_started_broadcasting_already = true;
+  }
+}
+
 void checkSerial() {
   // Check to see if someone has sent the magic kProgrammingMsg to us over Serial.
   // It it has, broadcast the programming message out to everyone on the mesh network
@@ -213,11 +230,7 @@ void checkSerial() {
     Serial.println("'!");
 
     if (input_str == kProgrammingMsg) {
-      // If we've gotten the right message enable the programming message task.  It
-      // will handle the rest of the progrss itself.
-      Serial.print("Entering Program Mode.  Broadcasting the message out first...");
-      scheduler.addTask(taskSendProgrammingMessage);
-      taskSendProgrammingMessage.enable();
+      broadcastProgrammingMessagesBeforeRebootingIntoOTAMode();
     }
   }
 }
