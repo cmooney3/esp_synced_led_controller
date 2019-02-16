@@ -90,9 +90,9 @@ Task taskSendProgrammingMessage(kProgrammingTriggerPeriodMS, TASK_FOREVER, &send
 // This works by setting the brightness_setting value with a new value.
 // When the main loop sees that this value is changed, it'll update the
 // brightness of the main LEDs via FastLEDs setBrightness() routine.
-int brightnesses[] = {7, 10, 30};
+int brightnesses[] = {10, 128, 255};
 int num_brightnesses = sizeof(brightnesses) / sizeof(brightnesses[0]);
-volatile int brightness_setting = 0; // Start at he lowest brightness on boot
+volatile int brightness_setting = 2; // Start at he lowest brightness on boot
 int current_brightness = brightness_setting;
 static unsigned long last_brightness_press_time = 0;
 void onBrightnessButtonChange() {
