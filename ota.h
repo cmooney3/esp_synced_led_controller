@@ -3,7 +3,7 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
-const char* wifi_ssid = "AirCanadaJazz";
+const char* wifi_ssid = "DOD Wi-Fi Network";
 extern const char* wifi_password;
 #include "passwords/wifi_password.h"
 
