@@ -46,9 +46,6 @@ static constexpr uint32_t kSerialBaudRate = 115200;
 #define xstr(a) str(a)
 #define str(a) #a
 
-// Animation settings
-static constexpr uint16_t kNumFrames = 300; // How many frames each animation gets to run for (duration)
-
 // Initialize the storage for all the LED values.  This is the format with which FastLED works.
 CRGB leds[kNumLEDs];
 
