@@ -2,6 +2,8 @@
 #define SCAN_H
 
 #define US_PER_S 1000000
+#define SCAN_RATE_HZ 10
+#define US_PER_TICK (US_PER_S / SCAN_RATE_HZ)
 
 #include "animation.h"
 
@@ -17,8 +19,17 @@ class ScanAnimation : public Animation {
     }
 
     void generateFrame(uint32_t time) {
-      uint32_t seconds = time / US_PER_S;
-      fill_solid(leds_, num_leds_, (seconds % 2 == 0) ? c1_ : c2_);
+      uint32_t ticks = time / US_PER_TICK;
+
+      fill_solid(leds_, num_leds_, c1_);
+
+      uint16_t num_positions = (num_leds_ * 2) - 1;
+      uint16_t selected_led_ = ticks % num_positions;
+      if (selected_led_ >= num_leds_) {
+          selected_led_ = num_positions - selected_led_;
+      }
+
+      leds_[selected_led_] = c2_;
     }
 
   private:

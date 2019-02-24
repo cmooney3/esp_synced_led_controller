@@ -16,7 +16,6 @@ Animation* buildNewAnimation(AnimationType type) {
 }
 Animation* current_animation;
 
-
 void SwitchToNextAnimation() {
   static uint8_t next_animation_type = 0;
   // First, avoid memory leaks by deleting the animation that's ending.
@@ -38,10 +37,5 @@ void renderNextFrame() {
   // Render the next frame
   current_animation->generateFrame(mesh.getNodeTime());
   FastLED.show();
-
-  // If that was the last frame of the animation, queue up the next one
-  //if (!has_more_frames) {
-  //  SwitchToNextAnimation();
-  //}
 }
 
