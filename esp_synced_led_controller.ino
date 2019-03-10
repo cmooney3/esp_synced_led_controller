@@ -34,11 +34,11 @@ static constexpr uint8_t kLEDPin = 5;
 constexpr int kBtnBounceTimeMS = 200;
 
 // Details of the LEDs attached
-static constexpr uint16_t kNumLEDs = 5; // How Many LEDs are connected
+constexpr uint16_t kNumLEDs = 5; // How Many LEDs are connected
 #define LED_TYPE WS2812B
 
 // The baud rate to use for the serial output (debugging info/etc).
-static constexpr uint32_t kSerialBaudRate = 115200;
+constexpr uint32_t kSerialBaudRate = 115200;
 
 // Stringification macros to convert a #defined constant into a string to
 // output in a debugging message.
@@ -325,9 +325,6 @@ void setup() {
     // Do the required mesh network maintenance.
     scheduler.addTask(taskUpdateMesh);
     taskUpdateMesh.enable();
-
-    // Set up the starting animation  Just pick the first one in the list.
-    current_animation = buildNewAnimation(static_cast<AnimationType>(0));
 
     Serial.println("Set up complete!  Entering main program loop now.");
     Serial.println();

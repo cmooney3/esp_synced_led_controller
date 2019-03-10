@@ -7,35 +7,20 @@
 
 #include "animation.h"
 
-namespace Scan {
+void scanAnimation(uint32_t time, CRGB* leds, int num_leds) {
+  CRGB colors[3] = {CRGB(255, 0, 0), CRGB(0, 255, 0), CRGB(0, 0, 255)};
+  uint32_t ticks = time / US_PER_TICK;
 
-constexpr int kMinSpeed = 5;
-constexpr int kMaxSpeed = 15;
+  fill_solid(leds, num_leds, CRGB(0, 0, 0));
 
-class ScanAnimation : public Animation {
-  public:
-    ScanAnimation(CRGB* leds, int num_leds) : Animation(leds, num_leds) {
-    }
+  uint16_t num_positions = (num_leds * 2) - 2;
+  uint16_t selected_led = ticks % num_positions;
+  if (selected_led >= num_leds) {
+      selected_led = num_positions - selected_led;
+  }
 
-    void generateFrame(uint32_t time) {
-      uint32_t ticks = time / US_PER_TICK;
+  int i = (ticks / (num_positions * 5)) % 3;
+  leds[selected_led] = colors[i];
+}
 
-      fill_solid(leds_, num_leds_, CRGB(0, 0, 0));
-
-      uint16_t num_positions = (num_leds_ * 2) - 2;
-      uint16_t selected_led_ = ticks % num_positions;
-      if (selected_led_ >= num_leds_) {
-          selected_led_ = num_positions - selected_led_;
-      }
-
-      int i = (ticks / (num_positions * 5)) % 3;
-      leds_[selected_led_] = colors_[i];
-    }
-
-  private:
-    CRGB colors_[3] = {CRGB(255, 0, 0), CRGB(0, 255, 0), CRGB(0, 0, 255)};
-};
-
-};
-
-#endif // PULSE_H
+#endif // SCAN_H
