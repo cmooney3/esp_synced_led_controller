@@ -10,6 +10,13 @@ constexpr int US_PER_S = 1000000;
 
 #define TO_MS(x) (x / US_PER_MS)
 
+typedef struct AnimationInputs {
+	CRGB* leds;
+	uint16_t num_leds;
+	uint32_t raw_time_us;
+	uint32_t time_since_animation_start_us;
+} AnimationInputs;
+
 // CRGB randomColor() {
 //     return CHSV(random(255), 255, 255);
 // }

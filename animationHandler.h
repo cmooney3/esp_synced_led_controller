@@ -9,9 +9,11 @@
 extern CRGB leds[kNumLEDs];
 extern painlessMesh mesh;
 
+// This struct is filled with the inputs to the animations before each frame is rendered.
+AnimationInputs animation_inputs;
 
 // Here we define the list of animations that the controller can play
-typedef void (*AnimationFunction)(uint32_t, CRGB*, int);
+typedef void (*AnimationFunction)(const AnimationInputs&);
 AnimationFunction animations[] = {
     rainbowScanAnimation,
     scanAnimation,
@@ -19,9 +21,20 @@ AnimationFunction animations[] = {
 };
 constexpr uint8_t NUM_ANIMATIONS = sizeof(animations) / sizeof(animations[0]);
 
+void fillAnimationInputs(AnimationInputs* inputs) {
+    animation_inputs.leds = leds;
+    animation_inputs.num_leds = kNumLEDs;
+    animation_inputs.raw_time_us = mesh.getNodeTime();
+
+    int animation_start_time_us = ((TO_MS(animation_inputs.raw_time_us) / ANIMATION_DURATION_MS) *
+                                   ANIMATION_DURATION_MS * US_PER_MS);
+    animation_inputs.time_since_animation_start_us =
+        animation_inputs.raw_time_us - animation_start_time_us;
+}
+
 void renderNextFrame() {
-  uint32_t time = mesh.getNodeTime();
-  int selected_animation = (TO_MS(time) / ANIMATION_DURATION_MS) % NUM_ANIMATIONS;
-  animations[selected_animation](time, leds, kNumLEDs);
+  fillAnimationInputs(&animation_inputs);
+  int selected_animation = (TO_MS(animation_inputs.raw_time_us) / ANIMATION_DURATION_MS) % NUM_ANIMATIONS;
+  animations[selected_animation](animation_inputs);
   FastLED.show();
 }
