@@ -1,14 +1,15 @@
 #ifndef SCAN_H
 #define SCAN_H
 
-#define US_PER_S 1000000
+#include "animation.h"
+
 #define SCAN_RATE_HZ 7
 #define US_PER_TICK (US_PER_S / SCAN_RATE_HZ)
 
-#include "animation.h"
 
 void scanAnimation(uint32_t time, CRGB* leds, int num_leds) {
   CRGB colors[3] = {CRGB(255, 0, 0), CRGB(0, 255, 0), CRGB(0, 0, 255)};
+
   uint32_t ticks = time / US_PER_TICK;
 
   fill_solid(leds, num_leds, CRGB(0, 0, 0));
