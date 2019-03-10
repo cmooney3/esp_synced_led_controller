@@ -3,6 +3,7 @@
 // All the various animations themselves
 #include "animations/scan.h"
 #include "animations/rainbowFade.h"
+#include "animations/rainbowScan.h"
 
 // These are defined in esp_synced_led_controller
 extern CRGB leds[kNumLEDs];
@@ -12,6 +13,7 @@ extern painlessMesh mesh;
 // Here we define the list of animations that the controller can play
 typedef void (*AnimationFunction)(uint32_t, CRGB*, int);
 AnimationFunction animations[] = {
+    rainbowScanAnimation,
     scanAnimation,
     rainbowFadeAnimation,
 };
