@@ -3,7 +3,7 @@
 
 #include <FastLED.h>
 
-constexpr int ANIMATION_DURATION_MS = 5000;
+constexpr int ANIMATION_DURATION_MS = 6000;
 
 constexpr int US_PER_MS = 1000;
 constexpr int US_PER_S = 1000000;

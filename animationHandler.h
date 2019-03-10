@@ -2,7 +2,7 @@
 
 // All the various animations themselves
 #include "animations/scan.h"
-#include "animations/flash.h"
+#include "animations/rainbowFade.h"
 
 // These are defined in esp_synced_led_controller
 extern CRGB leds[kNumLEDs];
@@ -13,7 +13,7 @@ extern painlessMesh mesh;
 typedef void (*AnimationFunction)(uint32_t, CRGB*, int);
 AnimationFunction animations[] = {
     scanAnimation,
-    flashAnimation,
+    rainbowFadeAnimation,
 };
 constexpr uint8_t NUM_ANIMATIONS = sizeof(animations) / sizeof(animations[0]);
 
