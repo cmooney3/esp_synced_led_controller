@@ -24,10 +24,12 @@ constexpr uint8_t NUM_ANIMATIONS = sizeof(animations) / sizeof(animations[0]);
 void fillAnimationInputs(AnimationInputs* inputs) {
     animation_inputs.leds = leds;
     animation_inputs.num_leds = kNumLEDs;
+
     animation_inputs.raw_time_us = mesh.getNodeTime();
 
-    int animation_start_time_us = ((TO_MS(animation_inputs.raw_time_us) / ANIMATION_DURATION_MS) *
-                                   ANIMATION_DURATION_MS * US_PER_MS);
+    animation_inputs.animation_number = TO_MS(animation_inputs.raw_time_us) / ANIMATION_DURATION_MS;
+
+    int animation_start_time_us = animation_inputs.animation_number * ANIMATION_DURATION_MS * US_PER_MS;
     animation_inputs.time_since_animation_start_us =
         animation_inputs.raw_time_us - animation_start_time_us;
 }
