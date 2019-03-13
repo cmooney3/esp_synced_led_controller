@@ -71,7 +71,7 @@ static constexpr uint8_t kBrightnessUpdatePeriodMS = 250;
 static constexpr uint16_t kSerialPollPeriodMS = 500;
 static constexpr uint8_t kArduinoOTAPeriodMS = 20;
 static constexpr uint8_t kMeshUpdatePeriodMS = 250;
-static constexpr uint16_t kProgrammingTriggerPeriodMS = 2000;
+static constexpr uint16_t kProgrammingTriggerPeriodMS = 200;
 // Build the actual "task" objects that are linked with periods, function pointers/etc
 // These Tasks have to be added to the scheduler and enabled before they run, so not all
 // of these tasks are enabled at once just because they appear here.
