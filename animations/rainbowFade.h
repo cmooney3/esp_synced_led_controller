@@ -1,13 +1,13 @@
 #ifndef RAINBOW_FADE_H
 #define RAINBOW_FADE_H
 
-#define PERIOD_MS 4200
+#define RAINBOW_FADE_PERIOD_MS 4200
 
 #include "animation.h"
 
 void rainbowFadeAnimation(const AnimationInputs& inputs) {
-  int offset = TO_MS(inputs.raw_time_us) % PERIOD_MS;
-  int h = 255 * offset / PERIOD_MS;
+  int offset = TO_MS(inputs.raw_time_us) % RAINBOW_FADE_PERIOD_MS;
+  int h = 255 * offset / RAINBOW_FADE_PERIOD_MS;
   fill_solid(inputs.leds, inputs.num_leds, CHSV(h, 255, 128));
 }
 
