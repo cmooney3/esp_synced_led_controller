@@ -20,7 +20,7 @@ typedef struct AnimationInputs {
     uint32_t animation_number;  // Count of how many animations since the start have played.
 
     uint16_t num_controllers; // How many controllers are on the current network.
-    uint16_t controller_number; // For the current network, what's this controller called.
+    uint16_t this_controller; // For the current network, what's this controller called.
 } AnimationInputs;
 
 int frame_number(const AnimationInputs& inputs, int frame_duration_ms) {

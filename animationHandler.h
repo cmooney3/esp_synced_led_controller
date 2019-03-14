@@ -4,6 +4,7 @@
 #include "animations/scan.h"
 #include "animations/rainbowFade.h"
 #include "animations/rainbowScan.h"
+#include "animations/sequencedBlink.h"
 
 #define CHIP_ID_NOT_FOUND 0xFFFFFFFF
 
@@ -17,6 +18,7 @@ AnimationInputs animation_inputs;
 // Here we define the list of animations that the controller can play
 typedef void (*AnimationFunction)(const AnimationInputs&);
 AnimationFunction animations[] = {
+    squencedBlinkAnimation,
     rainbowScanAnimation,
     scanAnimation,
     rainbowFadeAnimation,
@@ -51,17 +53,17 @@ void fillAnimationInputs(AnimationInputs* inputs) {
     // effects into your animations.
     chip_ids.sort();
     std::list<uint32_t>::const_iterator it;
-    animation_inputs.controller_number = CHIP_ID_NOT_FOUND;
+    animation_inputs.this_controller = CHIP_ID_NOT_FOUND;
     uint32_t i = 0;
     for (it = chip_ids.begin(); it != chip_ids.end(); it++) {
         if (*it == mesh.getNodeId()) {
-            animation_inputs.controller_number = i;
+            animation_inputs.this_controller = i;
             break;
         } else {
             i++;
         }
     }
-    if (animation_inputs.controller_number == CHIP_ID_NOT_FOUND) {
+    if (animation_inputs.this_controller == CHIP_ID_NOT_FOUND) {
         // This should _never_ happen -- this controller's chip ID should certainly be in the list
         // but just double-checking in case something goes screwy.
         Serial.println("ERROR: This controller's chip ID not found on it's own mesh!");
