@@ -11,11 +11,16 @@ constexpr int US_PER_S = 1000000;
 #define TO_MS(x) (x / US_PER_MS)
 
 typedef struct AnimationInputs {
-    CRGB* leds;
-    uint16_t num_leds;
-    uint32_t raw_time_us;
+    CRGB* leds; // The FastLED struct containing the LED colors.
+    uint16_t num_leds; // How many LEDs there are to control.
+
+    uint32_t raw_time_us; // The current, raw network time (in microseconds).
+    uint32_t time_since_animation_start_us; // The time since this animation started (in microseconds).
+
     uint32_t animation_number;  // Count of how many animations since the start have played.
-    uint32_t time_since_animation_start_us;
+
+    uint16_t num_controllers; // How many controllers are on the current network.
+    uint16_t controller_number; // For the current network, what's this controller called.
 } AnimationInputs;
 
 int frame_number(const AnimationInputs& inputs, int frame_duration_ms) {
@@ -46,22 +51,5 @@ CRGB random_color(const AnimationInputs& input, int color_index) {
     int h = rand() % 255;
     return CHSV(h, 255, 255);
 }
-
-// CRGB randomColor() {
-//     return CHSV(random(255), 255, 255);
-// }
-// 
-// void fillRandomContrastingColors(CRGB &c1, CRGB &c2) {
-//     int h1 = random(255);
-//     int offset = random(180) - 90;
-//     int h2 = (h1 + 128 + offset) % 255;
-//     
-//     c1 = CHSV(h1, 255, 255);
-//     c2 = CHSV(h2, 255, 255);
-// }
-// 
-// int randomDirection() {
-//     return random(0, 2) ? 1 : -1;
-// }
 
 #endif  // ANIMATION_H
