@@ -114,7 +114,7 @@ void setupUI() {
 void setupFastLED() {
   // Configure FastLED for the main RGB LED strip that this unit controls
   Serial.println("* Configuring FastLED.");
-  FastLED.addLeds<LED_TYPE, kLEDPin, RGB>(leds, kNumLEDs);
+  FastLED.addLeds<LED_TYPE, kLEDPin, GRB>(leds, kNumLEDs);
 
   // Set a starting brightness
   FastLED.setBrightness(brightnesses[brightness_setting]);
