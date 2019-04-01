@@ -5,6 +5,7 @@
 #include "animations/rainbowFade.h"
 #include "animations/rainbowScan.h"
 #include "animations/sequencedBlink.h"
+#include "animations/otamode.h"
 
 #define CHIP_ID_NOT_FOUND 0xFFFF
 
@@ -75,5 +76,12 @@ void renderNextFrame() {
   fillAnimationInputs(&animation_inputs);
   int selected_animation = (TO_MS(animation_inputs.raw_time_us) / ANIMATION_DURATION_MS) % NUM_ANIMATIONS;
   animations[selected_animation](animation_inputs);
+  FastLED.show();
+}
+
+void renderOTAModeNextFrame() {
+  AnimationInputs animation_inputs;
+  fillAnimationInputs(&animation_inputs);
+  OTAModeAnimation(animation_inputs);
   FastLED.show();
 }

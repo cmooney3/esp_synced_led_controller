@@ -60,6 +60,7 @@ Scheduler scheduler;
 // The function declarations of the functions called by the tasks that we'll be scheduling
 void sendMessage();
 void renderNextFrame();
+void renderOTAModeNextFrame();
 void checkSerial();
 void updateBrightness();
 void handleArduinoOTA();
@@ -77,6 +78,7 @@ static constexpr uint16_t kProgrammingTriggerPeriodMS = 200;
 // of these tasks are enabled at once just because they appear here.
 Task taskSendMessage(TASK_SECOND, TASK_FOREVER, &sendMessage);
 Task taskRenderNextFrame(kFrameGenerationPeriodMS, TASK_FOREVER, &renderNextFrame);
+Task taskRenderOTAModeNextFrame(kFrameGenerationPeriodMS, TASK_FOREVER, &renderOTAModeNextFrame);
 Task taskUpdateBrightness(kBrightnessUpdatePeriodMS, TASK_FOREVER, &updateBrightness);
 Task taskCheckSerial(kSerialPollPeriodMS, TASK_FOREVER, &checkSerial);
 Task taskArduinoOTA(kArduinoOTAPeriodMS, TASK_FOREVER, &handleArduinoOTA);
@@ -288,12 +290,20 @@ void setup() {
     // Set up the AndroidOTA callbacks and configure the library
     setupArduinoOTA();
 
+    // Set up the LEDs for displaying a few animations to indicate things like the
+    // fact we're in OTA mode, and the % progress as an update is going on
+    setupFastLED();
+
     // Configure the tasks for OTA mode with our task scheduler.
     // For OTA mode there is basically only one thing we do -- just check for updates.
     // This simple task is the only one that will run in this mode, and essentially
     // just makes the main loop spin forever waiting on an update.
     scheduler.addTask(taskArduinoOTA);
     taskArduinoOTA.enable();
+
+    // Render the pulsing animation letting you know it's in OTA Mode
+    scheduler.addTask(taskRenderOTAModeNextFrame);
+    taskRenderOTAModeNextFrame.enable();
   } else {
     // If we're in here, then that means we're booting the system into the
     // normal mode where the device syncs on a mesh network and renders animations.
