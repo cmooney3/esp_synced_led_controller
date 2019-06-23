@@ -1,10 +1,11 @@
 #include "animations/animation.h"
 
 // All the various animations themselves
-#include "animations/spin.h"
 #include "animations/rainbowFade.h"
 #include "animations/rainbowScan.h"
 #include "animations/sequencedBlink.h"
+#include "animations/spin.h"
+#include "animations/wipe.h"
 
 #define CHIP_ID_NOT_FOUND 0xFFFF
 
@@ -16,8 +17,9 @@ extern painlessMesh mesh;
 typedef void (*AnimationFunction)(const AnimationInputs&);
 AnimationFunction animations[] = {
     rainbowScanAnimation,
-    spinAnimation,
+    wipeAnimation,
     rainbowFadeAnimation,
+    spinAnimation,
  // squencedBlinkAnimation,
 };
 constexpr uint8_t NUM_ANIMATIONS = sizeof(animations) / sizeof(animations[0]);
