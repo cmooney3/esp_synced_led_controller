@@ -29,7 +29,7 @@ PASSWORDS_DIR="passwords"
 OUTPUT_BIN="${BUILD_DIR}/${INO}.bin"
 
 # Where ESPTOOL is, use find to not need to set it all up
-ESPTOOL="$(find ${HOME}/.arduino15/ -name esptool -type f)"
+ESPTOOL="$(find ${HOME}/.arduino15/ -name esptool.py -type f)"
 
 # The location of espota.py, this is used to perform ota updates
 ESPOTA=$(find ${HOME}/.arduino15 -name espota.py)
@@ -109,6 +109,7 @@ function compile {
   # TODO -- uncomment this and actually use this password.
   create_password_file_if_needed "mesh"
   create_password_file_if_needed "wifi"
+  create_password_file_if_needed "ota"
 
   # Compilation command
   JAVA_TOOL_OPTIONS='-Djava.awt.headless=true' "${ARDUINO}" "${ACTION}" \
@@ -135,52 +136,8 @@ function find_all_arduino_ota_ips {
   # https://github.com/esp8266/Arduino/issues/3553
   # TODO -- Check to see if these devices are the right kind (not other esps)
   ((avahi-browse _arduino._tcp --resolve --parsable --terminate) 2>/dev/null | \
-    grep -F "=;") | cut -d\; -f8
+    grep -F "=;") | cut -d\; -f8 | sort | uniq
 }
-function do_ota_fw_updates {
-  # This function sends out OTA FW updates to every ESP it can find on the LAN
-  # by first scanning, then sending out the updates one by one.
-  # Make sure that esptoa.py was found -- it's what does the actual updates, so
-  # if we can't find it we should just stop now.
-  if [ -z "${ESPOTA}" -o ! -f "${ESPOTA}" ]; then
-    print_error "Unable to find espota.py on your system.  This is"\
-                "required for OTA updates, and should be found in your"\
-                "arduino installation."
-    return 1
-  fi
-  # First detect all the ESP's on the LAN and build an array of their IPs.
-  print_heading "DETECTING OTA DEVICES ON THE LAN..."
-  ota_ips=($(find_all_arduino_ota_ips))
-  if [ ${#ota_ips[@]} -eq 0 ]; then
-    print_error "No OTA device(s) found on the network."
-  else
-    print_success "Found ${#ota_ips[@]} OTA devices on the network:"
-    for ip in ${ota_ips[@]}
-    do
-      echo -e "\t- ${ip}"
-    done
-  fi
-  echo
-
-  # Get the OTA password out of ota_password.h
-  ota_password="$(cat ${OTA_PASSWORD_FILE} | cut -d\" -f2)"
-
-  # Go through each of those IPs one-by-one and perform OTA FW updates.
-  print_heading "PERFORMING OTA FW UPDATES..."
-  for ip in "${ota_ips[@]}"
-  do
-    echo "FW Update Target: ${ip}"
-    python ${ESPOTA} -i $ip -p "${OTA_PORT}" -f "${OUTPUT_BIN}" \
-           --auth="${ota_password}"
-    ret=$?
-    if [ ${ret} -ne 0 ]; then
-      print_error "espota.py failed to apply update (err code: ${ret})"
-    else
-      print_success
-    fi
-  done
-}
-
 function do_ota_fw_updates {
   # This function sends out OTA FW updates to every ESP it can find on the LAN
   # by first scanning, then sending out the updates one by one.
@@ -257,7 +214,9 @@ function do_serial_fw_updates() {
     # when updating.  If something changes, just change --verify to --upload 
     # (and add --verbose) and run it once.  Look for the line like this that
     # uploads the program and replace it here.
-    ${ESPTOOL} -cd ck -cb 115200 -cp ${port} -ca 0x00000 -cf ${OUTPUT_BIN}
+    ${ESPTOOL} --chip esp8266 --port ${port} --baud 115200 \
+	       --after no_reset write_flash -z --flash_mode dio \
+	       --flash_freq 40m --flash_size detect 0x00000 ${OUTPUT_BIN}
     ret=$?
 
     # Check that there were no errors when uploading.

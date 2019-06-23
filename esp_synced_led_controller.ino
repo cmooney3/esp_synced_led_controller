@@ -33,7 +33,7 @@ static constexpr uint8_t kLEDPin = 5;
 constexpr int kBtnBounceTimeMS = 200;
 
 // Details of the LEDs attached
-constexpr uint16_t kNumLEDs = 5; // How Many LEDs are connected
+constexpr uint16_t kNumLEDs = 36; // How Many LEDs are connected
 #define LED_TYPE WS2812B
 
 // The baud rate to use for the serial output (debugging info/etc).
@@ -91,7 +91,7 @@ int num_brightnesses = sizeof(brightnesses) / sizeof(brightnesses[0]);
 volatile int brightness_setting = 2; // Start at he lowest brightness on boot
 int current_brightness = brightness_setting;
 static unsigned long last_brightness_press_time = 0;
-void onBrightnessButtonChange() {
+ICACHE_RAM_ATTR void onBrightnessButtonChange() {
   // Handle a button press of the brightness button.
   unsigned long now = millis();
   if (now - last_brightness_press_time > kBtnBounceTimeMS &&
