@@ -1,7 +1,7 @@
 #include "animations/animation.h"
 
 // All the various animations themselves
-#include "animations/scan.h"
+#include "animations/spin.h"
 #include "animations/rainbowFade.h"
 #include "animations/rainbowScan.h"
 #include "animations/sequencedBlink.h"
@@ -16,7 +16,7 @@ extern painlessMesh mesh;
 typedef void (*AnimationFunction)(const AnimationInputs&);
 AnimationFunction animations[] = {
     rainbowScanAnimation,
-    scanAnimation,
+    spinAnimation,
     rainbowFadeAnimation,
     squencedBlinkAnimation,
 };
