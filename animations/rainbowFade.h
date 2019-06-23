@@ -1,7 +1,7 @@
 #ifndef RAINBOW_FADE_H
 #define RAINBOW_FADE_H
 
-#define RAINBOW_FADE_PERIOD_MS 4200
+#define RAINBOW_FADE_PERIOD_MS 1000
 
 #include "animation.h"
 

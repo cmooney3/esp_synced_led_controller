@@ -18,7 +18,7 @@ AnimationFunction animations[] = {
     rainbowScanAnimation,
     spinAnimation,
     rainbowFadeAnimation,
-    squencedBlinkAnimation,
+ // squencedBlinkAnimation,
 };
 constexpr uint8_t NUM_ANIMATIONS = sizeof(animations) / sizeof(animations[0]);
 
